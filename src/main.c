@@ -30,7 +30,7 @@
     */
 
 mime mimes[800];
-int mimes_size = 0;
+int size_mimes = 0;
 
 char* getType(char *ext){
 	int indice = 0;
@@ -120,8 +120,9 @@ int addTypes(){
 
 int main(int argc, char * argv[]){
   struct sockaddr_in sin;
-  int sock_connexion, sock_communication, taille_addr = sizeof(sin), fd, retour_read;
-  char msg[2000], http_header[50], msg_retour[100], download_buffer[BUFFERSIZE];
+  int sock_connexion, sock_communication, fd, retour_read;
+  char msg[2000], http_header[50], download_buffer[BUFFERSIZE];
+	unsigned int taille_addr = sizeof(sin);
 
   addTypes();
 
@@ -187,18 +188,6 @@ int main(int argc, char * argv[]){
   }
 
   close(fd);
-  /*
-  strcpy(msg_retour, "Fichier envoye\n");
-  if(write(sock_communication, msg_retour, sizeof(msg_retour)) < 0){
-    perror("Erreur d'ecriture sur la socket\n");
-    return errno;
-  }*/
-  /*
-  strcpy(msg1, "HTTP/1.1 200 OK\nContent-Type: text/html\n\nCoucou");
-  if(write(sock_communication, msg1, sizeof(msg1)) < 0){
-  perror("Erreur d'ecriture sur la socket\n");
-    return errno;
-  }*/
 
   shutdown(sock_communication, SHUT_WR | SHUT_RD);
   close(sock_communication);

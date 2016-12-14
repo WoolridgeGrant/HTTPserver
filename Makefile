@@ -1,4 +1,4 @@
-# HTTP Server
+# makefile pour HTTP Server
 
 CC =gcc
 LDFLAGS =-lpthread -lrt
@@ -13,14 +13,22 @@ SRC=$(DIR)/src/
 
 HC=
 
-all: prog
+.PHONY: all clean main
+all: $(BIN)main
 
-prog: main.o
+prog: $(BIN)main
+	-$$PWD/bin/main
+
+$(BIN)%: $(OBJ)%.o
+	@if [ -d $(BIN) ]; then : ; else mkdir $(BIN); fi
 	$(CC) -o $@ $^ $(LDFLAGS)
 
-main.o: main.c
-	$(CC) -o $@ -c $< $(CFLAGS)
+$(OBJ)%.o: $(SRC)%.c $(HC)
+	@if [ -d $(OBJ) ]; then : ; else mkdir $(OBJ); fi
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+$(INCLUDE)%.h:
+	@if [ -d $(INCLUDE) ]; then : ; else mkdir $(INCLUDE); fi
 
 clean:
 	rm -rf $(OBJ)*.o $(BIN)*
-
