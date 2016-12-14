@@ -118,10 +118,76 @@ int addTypes(){
   return 1;
 }
 
+/*Recuperer le nom du chemin a partir du message envoye par le client qui se presente sous la forme :
+  GET /chemin HTTP/1.1, on ne veut pas du premier '/' car il indique le repertoire racine du serveur */
+char* getFilepath(char* client_msg){
+  int prem_slash = 0; /*Si prem_slash == 1 alors le premier / a ete lu*/
+  int i = 0, j = 0;
+  char char_lu;
+  char* filepath;
+
+  filepath = malloc(sizeof(char) * 50);
+  memset(filepath, 0, sizeof(char) * 50); 
+
+  while( (char_lu = client_msg[i]) != '\0' ){
+    printf("Charactere lu %c\n", char_lu);
+    if(char_lu == '/' && prem_slash == 0){
+      prem_slash++;
+      i++;
+      continue;
+    }
+
+    if(prem_slash == 1){
+      if(char_lu != ' '){
+        filepath[j] = char_lu;
+        j++;
+        printf("ici, valeur de i : %d\n", i);
+      }
+      else
+        break;
+    }
+    i++;
+  }
+  filepath[i] = '\0';
+  printf("filepath dans getFilepath : %s\n", filepath);
+  return filepath;
+}
+
+/*Lui donner un filepath copie, car strtok va detruire le filepath completement,
+  le filepath ne contiendra plus que la premiere chaine de caractere, celle qui
+  se trouve avant le premier slash.
+  Ex : samples/toto/file.pdf => filepath ne contiendra plus que samples a la fin
+  */
+char* getExtension(char* filepath){
+  const char slash[2] = "/";
+  const char point[2] = ".";
+	char *token_filename, *token_extension;
+  char filename[50], *extension;
+
+  extension = malloc(sizeof(char) * 50);
+
+  /*Recuperer nom du fichier*/
+  token_filename = strtok(filepath, slash);
+	while(token_filename != NULL){
+		strcpy(filename, token_filename);
+		token_filename = strtok(NULL, slash);
+	}
+
+  /*Recuperer extension*/
+  token_extension = strtok(filename, point);
+  while(token_extension != NULL){
+		strcpy(extension, token_extension);
+		token_extension = strtok(NULL, point);
+	}
+
+  return extension;
+}
+
 int main(int argc, char * argv[]){
   struct sockaddr_in sin;
   int sock_connexion, sock_communication, fd, retour_read;
-  char msg[2000], http_header[50], download_buffer[BUFFERSIZE];
+  char msg[2000], http_header[50], download_buffer[BUFFERSIZE], filepath_cpy[50];
+  char *filepath, *extension, *type;
 	unsigned int taille_addr = sizeof(sin);
 
   addTypes();
@@ -157,16 +223,25 @@ int main(int argc, char * argv[]){
   }
 	printf("%s", msg);
 
+  filepath = getFilepath(msg);
+  strcpy(filepath_cpy, filepath);
+  extension = getExtension(filepath_cpy);
+  type = getType(extension);
+
   /*application/pdf*/
+  /*TODO : Corriger cas text/plain*/
   memset(http_header, 0, sizeof(http_header));
-  strcpy(http_header, "HTTP/1.1 200 OK\nContent-Type: application/pdf\n\n"); /*Important de laisser une ligne vide entre le Content-Type et le contenu du fichier*/
+
+  strcpy(http_header, "HTTP/1.1 200 OK\nContent-Type: ");
+  strcat(http_header, type);
+  strcat(http_header, "\n\n"); /*Important de laisser une ligne vide entre le Content-Type et le contenu du fichier*/
+
   if(write(sock_communication, http_header, sizeof(http_header)) < 0){
     perror("Erreur d'ecriture sur la socket\n");
     return errno;
   }
 
-
-  if((fd = open("./samples/test.pdf", O_RDWR, 0644)) == -1){
+  if((fd = open(filepath, O_RDWR, 0644)) == -1){
     perror("Erreur ouverture du fichier");
     return errno;
   }
@@ -192,6 +267,8 @@ int main(int argc, char * argv[]){
   shutdown(sock_communication, SHUT_WR | SHUT_RD);
   close(sock_communication);
   close(sock_connexion);
+  free(filepath);
+  free(extension);
   printf("Fin de communication.\nTerminaison du serveur.\n");
   return 0;
 }
