@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <pthread.h>
 
 #include "../include/struct.h"
 
@@ -53,7 +54,7 @@ int addTypes(){
 	int presence_extension = 0;
 
 	char type[100];
-	char extension[100];
+	char extension[100]; 
 
 	memset(mimes, 0, sizeof(mimes));
 	memset(type, 0, sizeof(type));
@@ -182,12 +183,79 @@ char* getExtension(char* filepath){
   return extension;
 }
 
+
+void *routine(void* arg) {
+  char msg[2000];
+  char http_header[50];
+  int sock_communication = *((int*)arg);
+  int fd, retour_read;
+  char download_buffer[BUFFERSIZE];
+  char filepath_cpy[50];
+  char *filepath, *extension, *type;
+  struct sockaddr_in sin;
+  unsigned int taille_addr = sizeof(sin);
+
+
+  if(read(sock_communication, msg, sizeof(msg)) < 0){
+    perror("Erreur de lecture de la socket\n");
+    /*return errno;*/
+  }
+  filepath = getFilepath(msg);
+  strcpy(filepath_cpy, filepath);
+  extension = getExtension(filepath_cpy);
+  type = getType(extension);
+  /*application/pdf*/
+
+  /*TODO : Corriger cas text/plain*/
+  memset(http_header, 0, sizeof(http_header));
+
+  strcpy(http_header, "HTTP/1.1 200 OK\nContent-Type: ");
+  strcat(http_header, type);
+  strcat(http_header, "\n\n"); /*Important de laisser une ligne vide entre le Content-Type et le contenu du fichier*/
+
+  if(write(sock_communication, http_header, sizeof(http_header)) < 0){
+    perror("Erreur d'ecriture sur la socket\n");
+    /*return errno;*/
+  }
+
+  if((fd = open(filepath, O_RDWR, 0644)) == -1){
+    perror("Erreur ouverture du fichier");
+    /*return errno;*/
+  }
+
+  memset(download_buffer, 0, sizeof(download_buffer));
+  printf("download_buffer : %s\n", download_buffer);
+  while ( (retour_read = read(fd, download_buffer, sizeof(download_buffer))) > 0){
+    if(retour_read == -1){
+      perror("Erreur de lecture du fichier\n");
+      /*return errno;*/
+    }
+
+    printf("download_buffer dans while : %s\n", download_buffer);
+    /*On ecrit la taille qu'on lit sinon on aura des caracteres indesirables*/
+    if(write(sock_communication, download_buffer, retour_read) < 0){
+      perror("Erreur d'ecriture sur la socket\n");
+      /*return errno;*/
+    }
+  }
+
+  close(fd);
+
+  shutdown(sock_communication, SHUT_WR | SHUT_RD);
+  close(sock_communication);
+	/*free(sock_communication);*/
+  free(filepath);
+  free(extension);
+
+  pthread_exit(NULL);
+}
+
+
 int main(int argc, char * argv[]){
   struct sockaddr_in sin;
-  int sock_connexion, sock_communication, fd, retour_read;
-  char msg[2000], http_header[50], download_buffer[BUFFERSIZE], filepath_cpy[50];
-  char *filepath, *extension, *type;
-	unsigned int taille_addr = sizeof(sin);
+  int sock_communication, *sock_cpy, sock_connexion;
+  unsigned int taille_addr = sizeof(sin);
+  pthread_t *th;
 
   addTypes();
 
@@ -211,63 +279,26 @@ int main(int argc, char * argv[]){
   /*On ecoute sur la socket*/
   listen(sock_connexion, 5);
 
-  if( (sock_communication = accept(sock_connexion, (struct sockaddr*) &sin, &taille_addr)) == -1 ){
-    perror("Erreur accept\n");
-    return errno;
+  th = malloc( sizeof(pthread_t) );
+
+  while(1){
+    if( (sock_communication = accept(sock_connexion, (struct sockaddr*) &sin, &taille_addr)) == -1 ){
+			perror("Erreur accept\n");
+			return errno;
+		}
+
+		sock_cpy = malloc(sizeof(int));
+		*sock_cpy = sock_communication;
+	
+		if (pthread_create(th, NULL, routine, sock_cpy) != 0) {
+			printf("pthread_create\n");
+			exit(1);
+		}
+
   }
 
-  if(read(sock_communication, msg, sizeof(msg)) < 0){
-    perror("Erreur de lecture de la socket\n");
-    return errno;
-  }
-	printf("%s", msg);
-
-  filepath = getFilepath(msg);
-  strcpy(filepath_cpy, filepath);
-  extension = getExtension(filepath_cpy);
-  type = getType(extension);
-
-  /*application/pdf*/
-  /*TODO : Corriger cas text/plain*/
-  memset(http_header, 0, sizeof(http_header));
-
-  strcpy(http_header, "HTTP/1.1 200 OK\nContent-Type: ");
-  strcat(http_header, type);
-  strcat(http_header, "\n\n"); /*Important de laisser une ligne vide entre le Content-Type et le contenu du fichier*/
-
-  if(write(sock_communication, http_header, sizeof(http_header)) < 0){
-    perror("Erreur d'ecriture sur la socket\n");
-    return errno;
-  }
-
-  if((fd = open(filepath, O_RDWR, 0644)) == -1){
-    perror("Erreur ouverture du fichier");
-    return errno;
-  }
-
-  memset(download_buffer, 0, sizeof(download_buffer));
-  printf("download_buffer : %s\n", download_buffer);
-  while ( (retour_read = read(fd, download_buffer, sizeof(download_buffer))) > 0){
-    if(retour_read == -1){
-      perror("Erreur de lecture du fichier\n");
-      return errno;
-    }
-
-    printf("download_buffer dans while : %s\n", download_buffer);
-    /*On ecrit la taille qu'on lit sinon on aura des caracteres indesirables*/
-    if(write(sock_communication, download_buffer, retour_read) < 0){
-      perror("Erreur d'ecriture sur la socket\n");
-      return errno;
-    }
-  }
-
-  close(fd);
-
-  shutdown(sock_communication, SHUT_WR | SHUT_RD);
-  close(sock_communication);
   close(sock_connexion);
-  free(filepath);
-  free(extension);
+  
   printf("Fin de communication.\nTerminaison du serveur.\n");
   return 0;
 }

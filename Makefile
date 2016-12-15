@@ -13,7 +13,7 @@ SRC=$(DIR)/src/
 
 HC=
 
-.PHONY: all clean main
+.PHONY: all clean main curl
 all: $(BIN)main
 
 prog: $(BIN)main
@@ -32,3 +32,9 @@ $(INCLUDE)%.h:
 
 clean:
 	rm -rf $(OBJ)*.o $(BIN)*
+
+curl:
+	curl --header "X-Forwarded-For: 192.168.0.1" 127.0.0.1:7100/samples/test.txt
+	curl --header "X-Forwarded-For: 192.168.0.2" 127.0.0.1:7100/samples/test.txt
+	curl --header "X-Forwarded-For: 192.168.0.3" 127.0.0.1:7100/samples/test.txt
+	curl --header "X-Forwarded-For: 192.168.0.4" 127.0.0.1:7100/samples/test.txt
