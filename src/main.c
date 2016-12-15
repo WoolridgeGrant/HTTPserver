@@ -38,9 +38,18 @@ int size_mimes = 0;
 
 int main(int argc, char * argv[]){
   struct sockaddr_in sin;
-  int sock_communication, *sock_cpy, sock_connexion;
+  int sock_communication, *sock_cpy, sock_connexion, PORTSERV, nb_clients_max, seuil_octets;
   unsigned int taille_addr = sizeof(sin);
   pthread_t *th;
+
+  if(argc != 4){
+    perror("Le programme prend en argument le numéro de port sur lequel le serveur écoute; le nombre de client qu'il peut accepter simultanément; et le nombre limite d'octets transférables en une minute pour une ip.\n");
+    return EXIT_FAILURE;
+  }
+
+  PORTSERV = atoi(argv[1]);
+  nb_clients_max = atoi(argv[2]);
+  seuil_octets = atoi(argv[3]);
 
   addTypes();
 
@@ -62,7 +71,7 @@ int main(int argc, char * argv[]){
   /* Fin initialisation de socket */
 
   /*On ecoute sur la socket*/
-  listen(sock_connexion, 5);
+  listen(sock_connexion, nb_clients_max);
 
   th = malloc( sizeof(pthread_t) );
 
