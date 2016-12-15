@@ -1,6 +1,5 @@
 #ifndef STRUCT_H
 #define STRUCT_H
-#define PORTSERV 7100
 #define BUFFERSIZE 200
 
 typedef struct mime mime;

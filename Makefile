@@ -14,8 +14,11 @@ SRC=$(DIR)/src/
 HC=
 O=$(OBJ)initialisation.o $(OBJ)t_routine.o
 
-.PHONY: all clean curl
+.PHONY: all clean curl project
 all: $(BIN)main clean
+
+project: $(BIN)main
+	-bin/main 7100 5 200
 
 $(BIN)%: $(OBJ)%.o $O
 	@if [ -d $(BIN) ]; then : ; else mkdir $(BIN); fi
