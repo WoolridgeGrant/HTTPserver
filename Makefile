@@ -12,14 +12,12 @@ LIB=$(DIR)/lib/
 SRC=$(DIR)/src/
 
 HC=
+O=$(OBJ)initialisation.o $(OBJ)t_routine.o
 
-.PHONY: all clean main curl
-all: $(BIN)main
+.PHONY: all clean curl
+all: $(BIN)main clean
 
-prog: $(BIN)main
-	-$$PWD/bin/main
-
-$(BIN)%: $(OBJ)%.o
+$(BIN)%: $(OBJ)%.o $O
 	@if [ -d $(BIN) ]; then : ; else mkdir $(BIN); fi
 	$(CC) -o $@ $^ $(LDFLAGS)
 
@@ -31,7 +29,7 @@ $(INCLUDE)%.h:
 	@if [ -d $(INCLUDE) ]; then : ; else mkdir $(INCLUDE); fi
 
 clean:
-	rm -rf $(OBJ)*.o $(BIN)*
+	rm -rf $(OBJ)*.o
 
 curl:
 	curl --header "X-Forwarded-For: 192.168.0.1" 127.0.0.1:7100/samples/test.txt
