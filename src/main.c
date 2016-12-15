@@ -54,7 +54,7 @@ int addTypes(){
 	int presence_extension = 0;
 
 	char type[100];
-	char extension[100]; 
+	char extension[100];
 
 	memset(mimes, 0, sizeof(mimes));
 	memset(type, 0, sizeof(type));
@@ -131,7 +131,6 @@ char* getFilepath(char* client_msg){
   memset(filepath, 0, sizeof(char) * 50);
 
   while( (char_lu = client_msg[i]) != '\0' ){
-    printf("Charactere lu %c\n", char_lu);
     if(char_lu == '/' && prem_slash == 0){
       prem_slash++;
       i++;
@@ -142,7 +141,6 @@ char* getFilepath(char* client_msg){
       if(char_lu != ' '){
         filepath[j] = char_lu;
         j++;
-        printf("ici, valeur de i : %d\n", i);
       }
       else
         break;
@@ -183,12 +181,16 @@ char* getExtension(char* filepath){
   return extension;
 }
 
-
-void *routine(void* arg) {
+/*ERRNO IS THREAD-SAFE
+  errno is thread-local; setting it in one thread does not affect its value in any other thread.*/
+void *routine_answer(void* arg) {
   char msg[2000];
   char http_header[50];
   int sock_communication = *((int*)arg);
   int fd, retour_read;
+  int erreur = 0; /*s'il y a erreur alors egal a 1*/
+  char http_code[5] = "200 ";
+  char http_msg_retour[50] = "OK\n";
   char download_buffer[BUFFERSIZE];
   char filepath_cpy[50];
   char *filepath, *extension, *type;
@@ -206,40 +208,56 @@ void *routine(void* arg) {
   type = getType(extension);
   /*application/pdf*/
 
+  if((fd = open(filepath, O_RDWR, 0644)) == -1){
+    erreur = 1;
+    perror("Erreur ouverture du fichier");
+    if(errno == EACCES){ /*Permissions insuffisantes pour acceder au fichier*/
+      strcpy(http_code, "403 ");
+      strcpy(http_msg_retour, "Forbidden\n");
+    }
+    else if(errno == ENOENT){ /*Fichier inexistant*/
+      strcpy(http_code, "404 ");
+      strcpy(http_msg_retour, "Not Found\n");
+    }
+    /*return errno;*/
+  }
+
   /*TODO : Corriger cas text/plain*/
   memset(http_header, 0, sizeof(http_header));
 
-  strcpy(http_header, "HTTP/1.1 200 OK\nContent-Type: ");
-  strcat(http_header, type);
-  strcat(http_header, "\n\n"); /*Important de laisser une ligne vide entre le Content-Type et le contenu du fichier*/
+  strcpy(http_header, "HTTP/1.1 ");
+  strcat(http_header, http_code);
+  strcat(http_header, http_msg_retour);
+  if(!erreur){
+    strcat(http_header, "Content-Type: ");
+    strcat(http_header, type);
+    strcat(http_header, "\n\n"); /*Important de laisser une ligne vide entre le Content-Type et le contenu du fichier*/
+  }
 
+  printf("Header renvoye au client : \n%s\n", http_header);
   if(write(sock_communication, http_header, sizeof(http_header)) < 0){
     perror("Erreur d'ecriture sur la socket\n");
     /*return errno;*/
   }
 
-  if((fd = open(filepath, O_RDWR, 0644)) == -1){
-    perror("Erreur ouverture du fichier");
-    /*return errno;*/
-  }
 
-  memset(download_buffer, 0, sizeof(download_buffer));
-  printf("download_buffer : %s\n", download_buffer);
-  while ( (retour_read = read(fd, download_buffer, sizeof(download_buffer))) > 0){
-    if(retour_read == -1){
-      perror("Erreur de lecture du fichier\n");
-      /*return errno;*/
+  if(!erreur){
+    memset(download_buffer, 0, sizeof(download_buffer));
+    while ( (retour_read = read(fd, download_buffer, sizeof(download_buffer))) > 0){
+      if(retour_read == -1){
+        perror("Erreur de lecture du fichier\n");
+        /*return errno;*/
+      }
+
+      /*On ecrit la taille qu'on lit sinon on aura des caracteres indesirables*/
+      if(write(sock_communication, download_buffer, retour_read) < 0){
+        perror("Erreur d'ecriture sur la socket\n");
+        /*return errno;*/
+      }
     }
 
-    printf("download_buffer dans while : %s\n", download_buffer);
-    /*On ecrit la taille qu'on lit sinon on aura des caracteres indesirables*/
-    if(write(sock_communication, download_buffer, retour_read) < 0){
-      perror("Erreur d'ecriture sur la socket\n");
-      /*return errno;*/
-    }
+    close(fd);
   }
-
-  close(fd);
 
   shutdown(sock_communication, SHUT_WR | SHUT_RD);
   close(sock_communication);
@@ -289,8 +307,8 @@ int main(int argc, char * argv[]){
 
 		sock_cpy = malloc(sizeof(int));
 		*sock_cpy = sock_communication;
-	
-		if (pthread_create(th, NULL, routine, sock_cpy) != 0) {
+
+		if (pthread_create(th, NULL, routine_answer, sock_cpy) != 0) {
 			printf("pthread_create\n");
 			exit(1);
 		}
@@ -298,7 +316,7 @@ int main(int argc, char * argv[]){
   }
 
   close(sock_connexion);
-  
+
   printf("Fin de communication.\nTerminaison du serveur.\n");
   return 0;
 }
