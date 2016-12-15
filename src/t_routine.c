@@ -16,29 +16,30 @@
 #include "../include/initialisation.h"
 #include "../include/t_routine.h"
 #include "../include/globals.h"
+#include "../include/log.h"
 
 /*ERRNO IS THREAD-SAFE
   errno is thread-local; setting it in one thread does not affect its value in any other thread.*/
 void *routine_answer(void* arg) {
-  char msg[2000];
   char http_header[50];
-  int sock_communication = *((int*)arg);
+  requete *req = (requete*)arg;
   int fd, retour_read;
   int erreur = 0; /*s'il y a erreur alors egal a 1*/
-  char http_code[5] = "200 ";
-  char http_msg_retour[50] = "OK\n";
   char download_buffer[BUFFERSIZE];
   char filepath_cpy[50];
+  char http_code[5] = "200 ";
+  char http_msg_retour[50] = "OK\n";
   char *filepath, *extension, *type;
   struct sockaddr_in sin;
   unsigned int taille_addr = sizeof(sin);
 
 
-  if(read(sock_communication, msg, sizeof(msg)) < 0){
+  if(read(req->soc_com, req->msg, sizeof(req->msg)) < 0){
     perror("Erreur de lecture de la socket\n");
     /*return errno;*/
   }
-  filepath = getFilepath(msg);
+
+  filepath = getFilepath(req->msg);
   strcpy(filepath_cpy, filepath);
   extension = getExtension(filepath_cpy);
   type = getType(extension);
@@ -58,6 +59,8 @@ void *routine_answer(void* arg) {
     /*return errno;*/
   }
 
+  strcpy(req->http_code, http_code);
+
   /*TODO : Corriger cas text/plain*/
   memset(http_header, 0, sizeof(http_header));
 
@@ -71,7 +74,7 @@ void *routine_answer(void* arg) {
   }
 
   printf("Header renvoye au client : \n%s\n", http_header);
-  if(write(sock_communication, http_header, sizeof(http_header)) < 0){
+  if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
     perror("Erreur d'ecriture sur la socket\n");
     /*return errno;*/
   }
@@ -86,20 +89,26 @@ void *routine_answer(void* arg) {
       }
 
       /*On ecrit la taille qu'on lit sinon on aura des caracteres indesirables*/
-      if(write(sock_communication, download_buffer, retour_read) < 0){
+      if(write(req->soc_com, download_buffer, retour_read) < 0){
         perror("Erreur d'ecriture sur la socket\n");
         /*return errno;*/
       }
     }
 
+    /*taille fichier demandé*/
+    req->size_file = lseek(fd, 0, SEEK_END);
+
+    addLog(req);
+
     close(fd);
   }
 
-  shutdown(sock_communication, SHUT_WR | SHUT_RD);
-  close(sock_communication);
+  shutdown(req->soc_com, SHUT_WR | SHUT_RD);
+  close(req->soc_com);
 	/*free(sock_communication);*/
   free(filepath);
   free(extension);
+  free(req);
 
   pthread_exit(NULL);
 }

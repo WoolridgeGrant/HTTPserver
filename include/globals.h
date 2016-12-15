@@ -2,3 +2,5 @@
 
 extern mime mimes[800];
 extern int size_mimes;
+extern int fd_log;
+extern pthread_mutex_t mutex;
