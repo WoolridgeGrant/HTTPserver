@@ -12,7 +12,7 @@ LIB=$(DIR)/lib/
 SRC=$(DIR)/src/
 
 HC=
-O=$(OBJ)initialisation.o $(OBJ)t_routine.o
+O=$(OBJ)initialisation.o $(OBJ)t_routine.o $(OBJ)log.o
 
 .PHONY: all clean curl project
 all: $(BIN)main clean
@@ -39,3 +39,4 @@ curl:
 	curl --header "X-Forwarded-For: 192.168.0.2" 127.0.0.1:7100/samples/test.txt
 	curl --header "X-Forwarded-For: 192.168.0.3" 127.0.0.1:7100/samples/test.txt
 	curl --header "X-Forwarded-For: 192.168.0.4" 127.0.0.1:7100/samples/test.txt
+

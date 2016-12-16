@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <sys/stat.h>
 
 #include "../include/struct.h"
 #include "../include/initialisation.h"
@@ -35,12 +36,17 @@
 
 mime mimes[800];
 int size_mimes = 0;
+int fd_log;
+pthread_mutex_t fd_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char * argv[]){
   struct sockaddr_in sin;
-  int sock_communication, *sock_cpy, sock_connexion, PORTSERV, nb_clients_max, seuil_octets;
+  int sock_connexion, PORTSERV, nb_clients_max, seuil_octets;
   unsigned int taille_addr = sizeof(sin);
   pthread_t *th;
+  requete *req;
+  struct stat stat_info;
+  char filename_log[] = "tmp/http_2900793_3100300.log";
 
   if(argc != 4){
     perror("Le programme prend en argument le numéro de port sur lequel le serveur écoute; le nombre de client qu'il peut accepter simultanément; et le nombre limite d'octets transférables en une minute pour une ip.\n");
@@ -52,6 +58,23 @@ int main(int argc, char * argv[]){
   seuil_octets = atoi(argv[3]);
 
   addTypes();
+
+
+  if ( stat (filename_log, &stat_info) == -1) {
+    /*creation du fichier*/
+    if((fd_log = open(filename_log, O_CREAT|O_RDWR, 0644)) == -1){
+		perror("Erreur de creation du fichier");
+		return errno;	
+	}
+  } else {
+    /*ouverture du fichier de log*/
+    if((fd_log = open(filename_log, O_RDWR, 0644)) == -1){
+	  perror("Erreur d'ouverture du fichier");
+      return errno;
+    }
+    lseek(fd_log, 0, SEEK_END);/*offset à la fin*/
+  }
+
 
   if( (sock_connexion = socket(AF_INET, SOCK_STREAM, 0)) == -1){
     perror("Erreur de creation de socket\n");
@@ -76,22 +99,20 @@ int main(int argc, char * argv[]){
   th = malloc( sizeof(pthread_t) );
 
   while(1){
-    if( (sock_communication = accept(sock_connexion, (struct sockaddr*) &sin, &taille_addr)) == -1 ){
-			perror("Erreur accept\n");
-			return errno;
-		}
+    req = malloc(sizeof(struct requete));
+    if( (req->soc_com = accept(sock_connexion, (struct sockaddr*) &(req->sin), &taille_addr)) == -1 ){
+      perror("Erreur accept\n");
+      return errno;
+    }
 
-		sock_cpy = malloc(sizeof(int));
-		*sock_cpy = sock_communication;
-
-		if (pthread_create(th, NULL, routine_answer, sock_cpy) != 0) {
-			printf("pthread_create\n");
-			exit(1);
-		}
-
+    if (pthread_create(th, NULL, routine_answer, (void*)req) != 0) {
+      printf("pthread_create\n");
+      exit(1);
+    }
   }
 
   close(sock_connexion);
+  close(fd_log);
 
   printf("Fin de communication.\nTerminaison du serveur.\n");
   return 0;
