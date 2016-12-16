@@ -40,5 +40,3 @@ curl:
 	curl --header "X-Forwarded-For: 192.168.0.3" 127.0.0.1:7100/samples/test.txt
 	curl --header "X-Forwarded-For: 192.168.0.4" 127.0.0.1:7100/samples/test.txt
 
-test:
-	./bin/main 7100 5 5000

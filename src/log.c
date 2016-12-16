@@ -78,7 +78,7 @@ void addLog(requete *req){
 
 
   /*ecrire dans le fichier de log*/
-  pthread_mutex_lock(&mutex);
+  pthread_mutex_lock(&fd_log_mutex);
   i = 0;
   while(log[i] != '\0'){
     if(log[i] != '\n' && write(fd_log, &log[i], sizeof(char)) < 0){
@@ -93,7 +93,7 @@ void addLog(requete *req){
     /*return errno;*/
   }
   
-  pthread_mutex_unlock(&mutex);
+  pthread_mutex_unlock(&fd_log_mutex);
 
   printf("\n-> log ajouté\n");
 }
