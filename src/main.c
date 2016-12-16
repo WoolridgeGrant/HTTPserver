@@ -60,23 +60,21 @@ int main(int argc, char * argv[]){
   addTypes();
 
 
-
-  if ( stat (filename_log, &stat_info) == -1) { 
-    printf("creation du fichier de log\n");
-
+  if ( stat (filename_log, &stat_info) == -1) {
     /*creation du fichier*/
     if((fd_log = open(filename_log, O_CREAT|O_RDWR, 0644)) == -1){
-		perror("Erreur ouverture du fichier");
+		perror("Erreur de creation du fichier");
 		return errno;	
 	}
   } else {
     /*ouverture du fichier de log*/
     if((fd_log = open(filename_log, O_RDWR, 0644)) == -1){
-	  perror("Erreur ouverture du fichier");
-      /*return errno;*/
+	  perror("Erreur d'ouverture du fichier");
+      return errno;
     }
     lseek(fd_log, 0, SEEK_END);/*offset à la fin*/
   }
+
 
   if( (sock_connexion = socket(AF_INET, SOCK_STREAM, 0)) == -1){
     perror("Erreur de creation de socket\n");
@@ -107,10 +105,10 @@ int main(int argc, char * argv[]){
       return errno;
     }
 
-      if (pthread_create(th, NULL, routine_answer, (void*)req) != 0) {
-        printf("pthread_create\n");
-        exit(1);
-      }
+    if (pthread_create(th, NULL, routine_answer, (void*)req) != 0) {
+      printf("pthread_create\n");
+      exit(1);
+    }
   }
 
   close(sock_connexion);
