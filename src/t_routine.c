@@ -79,6 +79,8 @@ void *routine_answer(void* arg) {
     /*return errno;*/
   }
 
+  req->size_file = 0;
+
 
   if(!erreur){
     memset(download_buffer, 0, sizeof(download_buffer));
@@ -98,14 +100,13 @@ void *routine_answer(void* arg) {
     /*taille fichier demandé*/
     req->size_file = lseek(fd, 0, SEEK_END);
 
-    addLog(req);
-
     close(fd);
   }
 
+  addLog(req);
+
   shutdown(req->soc_com, SHUT_WR | SHUT_RD);
   close(req->soc_com);
-	/*free(sock_communication);*/
   free(filepath);
   free(extension);
   free(req);
