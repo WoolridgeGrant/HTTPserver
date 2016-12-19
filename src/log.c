@@ -14,14 +14,13 @@
 #include "../include/globals.h"
 #include "../include/log.h"
 
-
+/*Creer tmp*/
 void addLog(requete *req){
   char log[500], size[50], pid[50], tid[20], ip[20];
-  char n[] = "\n";
+  char n[2] = "\n";
   time_t rawtime;
   struct tm *timeinfo;
   int i;
-
 
   printf("\n**** log ****\n\n");
 
@@ -29,11 +28,10 @@ void addLog(requete *req){
 
   /*msg*/
   i = 0;
-  while(req->msg[i] != '\n'){
+  while(req->msg[i] != '\n'  && req->msg[i] != '\r'){ /*Appelez moi detective Conan : C'est une sequence CRLF (\r suivi de \n) qui separe les lignes*/
     log[i] = req->msg[i];
     i++;
   }
-  log[i-1] = ' ';
 
   /*size file*/
   printf("size_file : %d\n", req->size_file);
@@ -78,6 +76,7 @@ void addLog(requete *req){
 
 
   /*ecrire dans le fichier de log*/
+
   pthread_mutex_lock(&fd_log_mutex);
   i = 0;
   while(log[i] != '\0'){
@@ -92,12 +91,9 @@ void addLog(requete *req){
     perror("Erreur d'ecriture dans le fichier de log\n");
     /*return errno;*/
   }
-  
+
+
   pthread_mutex_unlock(&fd_log_mutex);
 
   printf("\n-> log ajouté\n");
 }
-
-
-
-
