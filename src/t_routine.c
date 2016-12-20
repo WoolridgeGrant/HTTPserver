@@ -18,32 +18,58 @@
 #include "../include/globals.h"
 #include "../include/log.h"
 
+/*Va read les requetes d'une meme connexion puis creer des threads routines
+  answer pour y repondre, en leur donnant en argument le thread qu'ils doivent
+  join a chaque fois. Pour le premier l'id ce thread en argument sera egal a 0
+  de sorte a ce qu'il sache qu'il n'y a personne a attendre
+  On lui donne en argument la requete completee*/
+void *routine_read_req(void* arg){
+  requete *req = (requete*)arg;
+  requete *req_tmp;
+  pthread_t *t_to_join = malloc(sizeof(pthread_t));
+  *t_to_join = 0;
+
+  /*while(1){*/
+  req_tmp = malloc(sizeof(struct requete));
+  req_tmp->thread_to_join = *t_to_join;
+  req_tmp->soc_com = req->soc_com;
+  req_tmp->sin = req->sin;
+  if(read(req_tmp->soc_com, req_tmp->msg, sizeof(req_tmp->msg)) < 0){
+    perror("Erreur de lecture de la socket\n");
+    /*return errno;*/
+  }
+
+  if (pthread_create(t_to_join, NULL, routine_answer, (void*)req_tmp) != 0) {
+    printf("pthread_create\n");
+    exit(1);
+  }
+  /*}*/
+
+}
+
 /*ERRNO IS THREAD-SAFE
   errno is thread-local; setting it in one thread does not affect its value in any other thread.*/
 void *routine_answer(void* arg) {
-  char http_header[50];
   requete *req = (requete*)arg;
+  struct sockaddr_in sin;
+  unsigned int taille_addr = sizeof(sin);
   int fd, retour_read;
   int erreur = 0; /*s'il y a erreur alors egal a 1*/
   char download_buffer[BUFFERSIZE];
+  char http_header[50];
   char filepath_cpy[50];
   char http_code[5] = "200 ";
   char http_msg_retour[50] = "OK\n";
   char *filepath, *extension, *type;
-  struct sockaddr_in sin;
-  unsigned int taille_addr = sizeof(sin);
 
-
-  if(read(req->soc_com, req->msg, sizeof(req->msg)) < 0){
-    perror("Erreur de lecture de la socket\n");
-    /*return errno;*/
+  if(req->thread_to_join != 0){
+    pthread_join(req->thread_to_join, NULL);
   }
 
   filepath = getFilepath(req->msg);
   strcpy(filepath_cpy, filepath);
   extension = getExtension(filepath_cpy);
   type = getType(extension);
-  /*application/pdf*/
 
   if((fd = open(filepath, O_RDWR, 0644)) == -1){
     erreur = 1;

@@ -63,13 +63,13 @@ int main(int argc, char * argv[]){
   if ( stat (filename_log, &stat_info) == -1) {
     /*creation du fichier*/
     if((fd_log = open(filename_log, O_CREAT|O_RDWR, 0644)) == -1){
-		perror("Erreur de creation du fichier");
-		return errno;	
-	}
+  		perror("Erreur de creation du fichier");
+  		return errno;
+  	}
   } else {
     /*ouverture du fichier de log*/
     if((fd_log = open(filename_log, O_RDWR, 0644)) == -1){
-	  perror("Erreur d'ouverture du fichier");
+      perror("Erreur d'ouverture du fichier");
       return errno;
     }
     lseek(fd_log, 0, SEEK_END);/*offset à la fin*/
@@ -105,7 +105,7 @@ int main(int argc, char * argv[]){
       return errno;
     }
 
-    if (pthread_create(th, NULL, routine_answer, (void*)req) != 0) {
+    if (pthread_create(th, NULL, routine_read_req, (void*)req) != 0) {
       printf("pthread_create\n");
       exit(1);
     }
