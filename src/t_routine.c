@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/un.h>
@@ -27,9 +28,11 @@ void *routine_read_req(void* arg){
   requete *req = (requete*)arg;
   requete *req_tmp;
   pthread_t *t_to_join = malloc(sizeof(pthread_t));
+  pthread_t tab_tid[100];
+  int size_tab = 0;
+  int i = 0;
   *t_to_join = 0;
 
-  /*while(1){*/
   req_tmp = malloc(sizeof(struct requete));
   req_tmp->thread_to_join = *t_to_join;
   req_tmp->soc_com = req->soc_com;
@@ -39,12 +42,25 @@ void *routine_read_req(void* arg){
     /*return errno;*/
   }
 
+  /*ici*/
+
   if (pthread_create(t_to_join, NULL, routine_answer, (void*)req_tmp) != 0) {
     printf("pthread_create\n");
     exit(1);
   }
-  /*}*/
 
+  tab_tid[i] = *t_to_join;
+  size_tab++;
+
+  for(i = 0; i < size_tab; i++){
+    pthread_join(tab_tid[i], NULL);
+  }
+
+  shutdown(req->soc_com, SHUT_WR | SHUT_RD);
+  close(req->soc_com);
+
+  free(t_to_join);
+  pthread_exit(NULL);
 }
 
 /*ERRNO IS THREAD-SAFE
@@ -131,11 +147,9 @@ void *routine_answer(void* arg) {
 
   addLog(req);
 
-  shutdown(req->soc_com, SHUT_WR | SHUT_RD);
-  close(req->soc_com);
   free(filepath);
   free(extension);
-  free(req);
+  /*free(req);*/
 
   pthread_exit(NULL);
 }

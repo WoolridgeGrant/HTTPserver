@@ -21,7 +21,7 @@ void addLog(requete *req){
   struct tm *timeinfo;
   int i;
 
-  printf("\n**** log ****\n\n");
+  printf("**** log ****\n\n");
 
   memset(log, 0, sizeof(log));
 
