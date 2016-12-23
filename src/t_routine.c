@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,50 +26,81 @@
   de sorte a ce qu'il sache qu'il n'y a personne a attendre
   On lui donne en argument la requete completee*/
 void *routine_read_req(void* arg){
-  requete *req = (requete*)arg;
-  requete *req_tmp;
-  pthread_t *t_to_join = malloc(sizeof(pthread_t));
-  pthread_t tab_tid[100];
-  int size_tab = 0;
-  int i = 0;
-  *t_to_join = 0;
+    requete *req = (requete*)arg;
+    requete *req_tmp = malloc(sizeof(struct requete));
+    pthread_t *t_to_join = malloc(sizeof(pthread_t));
+    pthread_t tab_tid[100];
+    int size_tab = 0;
+    int i = 0;
 
-  req_tmp = malloc(sizeof(struct requete));
-  req_tmp->thread_to_join = *t_to_join;
-  req_tmp->soc_com = req->soc_com;
-  req_tmp->sin = req->sin;
-  if(read(req_tmp->soc_com, req_tmp->msg, sizeof(req_tmp->msg)) < 0){
-    perror("Erreur de lecture de la socket\n");
-    /*return errno;*/
-  }
+    int nb_req = 0;
+    unsigned int cpt = 0;/*compteur sur les caractère de la rafale de requete*/
+    int j = 0;           /*indice pour la separation de requete*/
+    int nb_CRLF= 0;     /*nombre de '\r' et de '\n' */
+    char reqs[2000];
+    memset(reqs, 0, sizeof(reqs));
 
-  /*ici*/
+    /*Linux interprete \r\n comme un seul saut de ligne, il ignore \r*/
 
-  if (pthread_create(t_to_join, NULL, routine_answer, (void*)req_tmp) != 0) {
-    printf("pthread_create\n");
-    exit(1);
-  }
+    *t_to_join = 0;
 
-  tab_tid[i] = *t_to_join;
-  size_tab++;
+    if(read(req->soc_com, reqs, sizeof(reqs)) < 0){
+        perror("Erreur de lecture de la socket\n");
+        /*return errno;*/
+    }
 
-  for(i = 0; i < size_tab; i++){
-    pthread_join(tab_tid[i], NULL);
-  }
+    while(cpt < sizeof(reqs)){
+        if((nb_CRLF % 2 == 0) && reqs[cpt] == '\r')
+            nb_CRLF++;
+        else if((nb_CRLF % 2 != 0) && reqs[cpt] == '\n')
+            nb_CRLF++;
+        else if(nb_CRLF != 0)
+            nb_CRLF = 0;
 
-  shutdown(req->soc_com, SHUT_WR | SHUT_RD);
-  close(req->soc_com);
+        if(nb_CRLF == 4){
+            req_tmp->msg[j] = reqs[cpt]; /* Pour recuperer le dernier \n*/
+            nb_req++;
+            nb_CRLF = 0;
+            j=0;
+            req_tmp->thread_to_join = *t_to_join;
+            req_tmp->soc_com = req->soc_com;
+            req_tmp->sin = req->sin;
+            if (pthread_create(t_to_join, NULL, routine_answer, (void*)req_tmp) != 0) {
+              printf("pthread_create\n");
+              exit(1);
+            }
 
-  free(t_to_join);
-  pthread_exit(NULL);
+            tab_tid[i] = *t_to_join;
+            size_tab++;
+            printf("Requete No. %d : %s\n", nb_req, req_tmp->msg);
+            /*memset(req_tmp, 0, sizeof(req_tmp));*/
+
+            req_tmp = malloc(sizeof(struct requete));
+        }
+        else{
+            req_tmp->msg[j] = reqs[cpt];
+            j++;
+        }
+        cpt++;
+    }
+
+    for(i = 0; i < size_tab; i++){
+        pthread_join(tab_tid[i], NULL);
+    }
+
+    shutdown(req->soc_com, SHUT_WR | SHUT_RD);
+    close(req->soc_com);
+
+    free(req);
+    free(req_tmp); /*On en alloue un en trop a la fin de la boucle que l'on free ici*/
+    free(t_to_join);
+    pthread_exit(NULL);
 }
 
 /*ERRNO IS THREAD-SAFE
   errno is thread-local; setting it in one thread does not affect its value in any other thread.*/
 void *routine_answer(void* arg) {
   requete *req = (requete*)arg;
-  struct sockaddr_in sin;
-  unsigned int taille_addr = sizeof(sin);
   int fd, retour_read;
   int erreur = 0; /*s'il y a erreur alors egal a 1*/
   char download_buffer[BUFFERSIZE];
@@ -149,7 +181,7 @@ void *routine_answer(void* arg) {
 
   free(filepath);
   free(extension);
-  /*free(req);*/
+  free(req);
 
   pthread_exit(NULL);
 }
