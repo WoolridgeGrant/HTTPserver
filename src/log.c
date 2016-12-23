@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 #include "../include/struct.h"
 #include "../include/globals.h"
@@ -16,57 +17,72 @@
 
 /*Creer tmp*/
 void addLog(requete *req){
-  char log[500], size[50], pid[50], tid[20], ip[20];
+  char log[500], time_now[50], size[50], pid[50], tid[20], ip[20];
   time_t rawtime;
   struct tm *timeinfo;
-  int i;
+  int i, j_date;
 
   printf("**** log ****\n\n");
 
   memset(log, 0, sizeof(log));
 
-  /*msg*/
-  i = 0;
-  while(req->msg[i] != '\n'  && req->msg[i] != '\r'){ /*C'est une sequence CRLF (\r CARRIAGE RETURN suivi de \n LINE FEED) qui separe les lignes*/
-    log[i] = req->msg[i];
-    i++;
-  }
-
-  /*size file*/
-  printf("size_file : %d\n", req->size_file);
-  strcat(log, ", size : ");
-  sprintf(size, "%d", req->size_file);
-  strcat(log, size);
-
-  /*http_code*/
-  printf("http_code : %s\n", req->http_code);
-  strcat(log, ", http_code : ");
-  strcat(log, req->http_code);
-
   /*ip clt*/
   printf("ip : %s\n", inet_ntoa(req->sin.sin_addr));
-  strcat(log, ", ip : ");
   sprintf(ip, "%s", inet_ntoa(req->sin.sin_addr));
   strcat(log, ip);
+  strcat(log, " ");
+
+  /*date et heure*/
+  time ( &rawtime );
+  timeinfo = localtime ( &rawtime );
+  memset(time_now, 0, sizeof(time_now));
+  strcpy(time_now, asctime (timeinfo));/*Ajoute /n, le while qui suit sert à le retirer*/
+
+  i = 0;
+  while(i < sizeof(time_now)){
+    if(time_now[i] == '\n'){
+      time_now[i] = '\0';
+    }
+    i++;
+  }
+  strcat(log, time_now);
+  printf("date : %s\n", time_now); 
 
   /*pid server*/
   printf("pid server : %d\n", getpid());
-  strcat(log, ", PID server : ");
   sprintf(pid, "%d", getpid());
   strcat(log, pid);
 
   /*tid*/
   printf("tid : %ld\n", (long)pthread_self());
-  strcat(log, ", tid : ");
   sprintf(tid, "%ld", (long)pthread_self());
   strcat(log, tid);
+  strcat(log, " ");
 
-  /*date et heure*/
-  time ( &rawtime );
-  timeinfo = localtime ( &rawtime );
-  strcat(log, ", time : ");
-  strcat(log, asctime (timeinfo));
-  printf("date : %s", asctime (timeinfo)); /*Ajoute /n*/
+  /*msg*/
+  if(strlen(req->msg) != 0){
+    i = 0;
+    j_date = 0;
+    while(log[i] != '\0'){
+      i++;
+    }
+    while(req->msg[j_date] != '\n'  && req->msg[j_date] != '\r'){ /*C'est une sequence CRLF (\r CARRIAGE RETURN suivi de \n LINE FEED) qui separe les lignes*/
+      log[i] = req->msg[j_date];
+      i++;
+      j_date++;
+    }
+  }
+
+  /*http_code*/
+  printf("http_code : %s\n", req->http_code);
+  strcat(log, " ");
+  strcat(log, req->http_code);
+
+  /*size file*/
+  printf("size_file : %d\n", req->size_file);
+  sprintf(size, "%d", req->size_file);
+  strcat(log, size);
+  strcat(log, "\n");
 
   /*ecrire dans le fichier de log*/
   pthread_mutex_lock(&fd_log_mutex);
