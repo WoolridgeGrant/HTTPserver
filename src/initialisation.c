@@ -23,10 +23,10 @@ char* getType(char *ext){
 
 	while(indice <= size_mimes){
 		if(strcmp(ext, mimes[indice].ext) == 0){
-      return mimes[indice].type;
-		}
+      	return mimes[indice].type;
+	}
     else
-			indice++;
+		indice++;
 	}
 
   return NULL;
