@@ -64,7 +64,7 @@ int main(int argc, char * argv[]){
         mkdir("./tmp", 0744);
     }
 
-    if ( stat (filename_log, &stat_info) == -1) {
+    if ( stat(filename_log, &stat_info) == -1) {
         /*creation du fichier*/
         if((fd_log = open(filename_log, O_CREAT|O_RDWR, 0644)) == -1){
         		perror("Erreur de creation du fichier");

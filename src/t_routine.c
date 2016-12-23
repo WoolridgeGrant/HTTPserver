@@ -5,6 +5,7 @@
 #include <sys/un.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <errno.h>
 #include <string.h>
 #include <netinet/in.h>
@@ -109,6 +110,7 @@ void *routine_answer(void* arg) {
   char http_code[5] = "200 ";
   char http_msg_retour[50] = "OK\n";
   char *filepath, *extension, *type;
+  struct stat stat_info;
 
   if(req->thread_to_join != 0){
     pthread_join(req->thread_to_join, NULL);
@@ -119,7 +121,17 @@ void *routine_answer(void* arg) {
   extension = getExtension(filepath_cpy);
   type = getType(extension);
 
-  if((fd = open(filepath, O_RDWR, 0644)) == -1){
+  if ( stat(filepath, &stat_info) == -1) {
+      perror("Erreur stat dans routine_answer\n");
+      /*return errno;*/
+  }
+
+  if(S_ISDIR(stat_info.st_mode)){
+      erreur = 1;
+      strcpy(http_code, "400 ");
+      strcpy(http_msg_retour, "Bad Request\n");
+  }
+  else if((fd = open(filepath, O_RDWR, 0644)) == -1){
     erreur = 1;
     perror("Erreur ouverture du fichier");
     if(errno == EACCES){ /*Permissions insuffisantes pour acceder au fichier*/
