@@ -17,6 +17,7 @@ struct requete{
 	char http_code[10];
 	int soc_com;
 	int size_file;
+	pthread_t thread_to_join; /*L'id du thread a join*/
 };
 
 #endif
