@@ -20,4 +20,10 @@ struct requete{
 	pthread_t thread_to_join; /*L'id du thread a join*/
 };
 
+typedef struct executable executable;
+struct executable{
+	int pid_fils;
+    int killed;
+};
+
 #endif
