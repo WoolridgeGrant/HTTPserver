@@ -23,7 +23,7 @@ struct requete{
 typedef struct executable executable;
 struct executable{
 	int pid_fils;
-    int killed;
+	int killed;
 };
 
 #endif
