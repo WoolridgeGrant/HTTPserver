@@ -15,12 +15,38 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <sys/wait.h>
-
+#include <mqueue.h>
 
 #include "../include/initialisation.h"
 #include "../include/t_routine.h"
 #include "../include/globals.h"
 #include "../include/log.h"
+
+void *routine_watcher(void *arg){
+	unsigned int prio;
+	infos_watcher buf;
+	/*buf = malloc(sizeof(infos_watcher));*/
+
+	printf("Dans thread watcher\n");
+	printf("Valeur de attr.mq_msgsize dans routine_watcher : %d\n", attr.mq_msgsize);
+
+	for(;;){
+		if(mq_receive(mq_des, (char*) &buf, attr.mq_msgsize, NULL) == -1){
+			perror("Erreur de réception de la file de message");
+			/*return errno;*/
+		}
+		printf("Un thread a mis a jour une data ip : %s\n", buf.ip);
+		printf("Un thread a mis a jour une data size : %d\n", buf.data);
+		printf("Un thread a mis a jour une data tid : %ld\n", buf.tid);
+	}
+	/*free(buf);*/
+	/*mq_close(mq_des);*/
+	pthread_exit(NULL);
+}
+
+void *routine_clock(void* arg){
+	pthread_exit(NULL);
+}
 
 /*Va read les requetes d'une meme connexion puis creer des threads routines
   answer pour y repondre, en leur donnant en argument le thread qu'ils doivent
@@ -43,6 +69,7 @@ void *routine_read_req(void* arg){
 	memset(reqs, 0, sizeof(reqs));
 
 	/*Linux interprete \r\n comme un seul saut de ligne, il ignore \r*/
+	printf("read routine\n");
 
 	*t_to_join = 0;
 
@@ -125,6 +152,7 @@ void *routine_answer(void* arg) {
 	char http_code[5] = "200 ";
 	char http_msg_retour[50] = "OK\n";
 	char *filepath, *extension, *type;
+	char filename[100];
 	struct stat stat_file;
 	int status;
 	int pid;
@@ -135,11 +163,10 @@ void *routine_answer(void* arg) {
 	int size = 0;
 	unsigned int i;
 	int j;
-	char filename[100];
+	infos_watcher iw;
 
 	exe = malloc(sizeof(struct executable));
 	exe->killed = 0;
-
 
 	if(req->thread_to_join != 0){
 		pthread_join(req->thread_to_join, NULL);
@@ -147,6 +174,11 @@ void *routine_answer(void* arg) {
 
 	filepath = getFilepath(req->msg);
 
+	/*Envoie la taille de ce qu'il a ecrit au watcher seulement une fois qu'il a fini d'ecrire puis on unlock : Race condition pour mettre le data a jour??*/
+
+	/*Parcours les listes chainees avant chaque ecriture*/
+	/*Mettre un mutex commun (dans la structure infos_watcher) a toutes les threads
+	d'une meme ip avant ecriture, de cette maniere on est surs que le data est a jour*/
 	if (stat(filepath, &stat_file) == -1) { /*si la ressource n'existe pas*/
 		perror("erreur stat");
 		if(errno == EACCES){ /*Permissions insuffisantes pour acceder au fichier*/
@@ -168,13 +200,13 @@ void *routine_answer(void* arg) {
 
 		strcpy(req->http_code, http_code);
 
-		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
+		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){  /*******************ICI**************************/
 			perror("Erreur d'ecriture sur la socket\n");
 			/*return errno;*/
 		}
 		size = 0;
 		/*return errno;*/
-	} 
+	}
 	else if(S_ISDIR(stat_file.st_mode)){ /*si la ressource demandée est un dossier, on envoit une erreur 400*/
 		strcpy(http_code, "400 ");
 		strcpy(http_msg_retour, "Bad Request\n");
@@ -187,12 +219,12 @@ void *routine_answer(void* arg) {
 
 		strcpy(req->http_code, http_code);
 
-		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
+		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){  /*******************ICI**************************/
 			perror("Erreur d'ecriture sur la socket\n");
 			/*return errno;*/
 		}
 		size = 0;
-	} 
+	}
 	else if(stat_file.st_mode & S_IXUSR){ /* si la ressource est un exécutable */
 		if(pipe(descripteurTube) != 0) {
 			fprintf(stderr, "Erreur de création du tube.\n");
@@ -228,7 +260,7 @@ void *routine_answer(void* arg) {
 			dup2(descripteurTube[1],STDOUT_FILENO);
 			execl(filepath, filename, NULL);
 			exit(EXIT_FAILURE);
-		} 
+		}
 		else{
 			exe->pid_fils = pid;
 
@@ -256,11 +288,11 @@ void *routine_answer(void* arg) {
 				strcat(http_header, http_code);
 				strcat(http_header, http_msg_retour);
 
-				if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
+				if(write(req->soc_com, http_header, sizeof(http_header)) < 0){  /*******************ICI**************************/
 					perror("Erreur d'ecriture sur la socket\n");
 					/*return errno;*/
 				}
-			} 
+			}
 			else {
 				printf("Exécutable : succès\n");
 				size = 0;
@@ -282,7 +314,7 @@ void *routine_answer(void* arg) {
 
 			size = req->size_file;
 		}
-	} 
+	}
 	else { /* si la ressource n'est pas un exécutable */
 		strcpy(filepath_cpy, filepath);
 		extension = getExtension(filepath_cpy);
@@ -301,7 +333,6 @@ void *routine_answer(void* arg) {
 			}
 		}
 
-		/*TODO : Corriger cas text/plain*/
 		memset(http_header, 0, sizeof(http_header));
 
 		strcpy(http_header, "HTTP/1.1 ");
@@ -316,7 +347,7 @@ void *routine_answer(void* arg) {
 
 		strcpy(req->http_code, http_code);
 
-		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
+		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){  /*******************ICI**************************/
 			perror("Erreur d'ecriture sur la socket\n");
 			/*return errno;*/
 		}
@@ -332,7 +363,7 @@ void *routine_answer(void* arg) {
 				}
 
 				/*On ecrit la taille qu'on lit sinon on aura des caracteres indesirables*/
-				if(write(req->soc_com, download_buffer, retour_read) < 0){
+				if(write(req->soc_com, download_buffer, retour_read) < 0){  /*******************ICI**************************/
 					perror("Erreur d'ecriture sur la socket\n");
 					/*return errno;*/
 				}
@@ -354,6 +385,20 @@ void *routine_answer(void* arg) {
 	printf("Code HTTP : %s\n", http_code);
 	printf("Quantité données renvoyées : %d octets\n", size);
 
+	/*iw = malloc(sizeof(infos_watcher));*/
+	sprintf(iw.ip, "%s", inet_ntoa(req->sin.sin_addr));
+	iw.tid = pthread_self();
+	iw.data = size;
+	printf("mq_des valeur dans thread_answer : %d\n", mq_des);
+	printf("Valeur de attr.mq_msgsize dans thread_answer : %d\n", attr.mq_msgsize);
+	if(mq_send(mq_des, (const char*) &iw,  sizeof(struct infos_watcher), 0) == -1){
+		perror("Erreur d'envoi du message a la file de message\n");
+		/*return errno;*/
+	}
+
+	printf("Dans thread_answer, tid : %ld\n", iw.tid);
+	printf("Dans thread_answer, ip : %s\n", iw.ip);
+	printf("Dans thread_answer, data : %d\n", iw.data);
 	addLog(req);
 
 	pthread_exit(NULL);

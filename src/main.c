@@ -14,6 +14,7 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <mqueue.h>
 
 #include "../include/struct.h"
 #include "../include/initialisation.h"
@@ -22,17 +23,8 @@
 
 /*Le serveur prend en argument le numero de port sur lequel il ecoute,
   le nombre de clients qu'il peut accepter simultanement
-  et un argument determine en question 5*/
-
-/*  TODO :
-    1. Recuperer le port sur lequel le serv ecoute ainsi que le nb de clients max
-    2. Lancer un thread a chaque connexion de client
-    3. Faire tous les trucs pour accepter une connexion sur la routine du thread
-    4. Recuperer les deux lignes envoyees par le navigateur en parcourant caractere par caractere pour trouver \n
-    5. Parcourir le tableau des Content-Type et recuperer la bonne cle
-    6. Envoyer les deux lignes
-    7. Envoyer le contenu du fichier
-    */
+  et un argument indiquant la quantite max d'octets qu'une ip peut recevoir
+  en une minute*/
 
 mime mimes[800];
 int size_mimes = 0;
@@ -40,11 +32,16 @@ int fd_log;
 char filename_log[30] = "tmp/http_2900793_3100300.log";
 pthread_mutex_t fd_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+mqd_t mq_des;
+struct mq_attr attr;
+pthread_mutex_t fd_mq_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 int main(int argc, char * argv[]){
 	struct sockaddr_in sin;
 	int sock_connexion, PORTSERV, nb_clients_max, seuil_octets;
 	unsigned int taille_addr = sizeof(sin);
 	pthread_t *th;
+	pthread_t watcher_tid;
 	requete *req;
 	struct stat stat_info;
 	struct stat stat_info_dir;
@@ -58,8 +55,27 @@ int main(int argc, char * argv[]){
 	nb_clients_max = atoi(argv[2]);
 	seuil_octets = atoi(argv[3]);
 
+	/*Initialisation de la file de message*/
+
+	printf("avant mqopen\n");
+	if((mq_des = mq_open("/file3", O_RDWR | O_CREAT, 0644, NULL)) == -1){
+		perror("Erreur de création du file");
+		return EXIT_FAILURE;
+	}
+
+	printf("avant getaddr\n");
+	if(mq_getattr(mq_des, &attr) == -1){
+		perror("Erreur de recuperation des attributs du mq");
+		return errno;
+	}
+
+	printf("mq_des valeur dans main : %d\n", mq_des);
+	printf("apres getaddr\n");
+	/*buf = malloc(attr.mq_msgsize);*/
+
 	addTypes();
 
+	/*Initialisation des log*/
 	if (stat("./tmp", &stat_info_dir) == -1) {
 		mkdir("./tmp", 0744);
 	}
@@ -79,7 +95,17 @@ int main(int argc, char * argv[]){
 		lseek(fd_log, 0, SEEK_END);/*offset à la fin*/
 	}
 
+	/*Creation de la thread watcher, qui va surveiller les donnees envoyees a
+		chaque ip*/
+	if (pthread_create(&watcher_tid, NULL, routine_watcher, NULL) != 0) {
+		printf("pthread_create\n");
+		exit(1);
+	}
 
+
+	printf("apres creation watcher\n");
+
+	/*Mise en place de la socket*/
 	if( (sock_connexion = socket(AF_INET, SOCK_STREAM, 0)) == -1){
 		perror("Erreur de creation de socket\n");
 		return errno;

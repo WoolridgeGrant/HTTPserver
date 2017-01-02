@@ -2,7 +2,7 @@
 
 CC =gcc
 LDFLAGS =-lpthread -lrt
-CFLAGS =-W -Wall -ansi -pedantic -Iinclude
+CFLAGS =-g -W -Wall -ansi -pedantic -Iinclude 
 
 DIR=.
 BIN=$(DIR)/bin/

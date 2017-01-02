@@ -20,7 +20,8 @@ void addLog(requete *req){
 	char log[500], time_now[50], size[50], pid[50], tid[20], ip[20];
 	time_t rawtime;
 	struct tm *timeinfo;
-	int i, j_date;
+	unsigned int i; 
+	int j_date;
 
 	memset(log, 0, sizeof(log));
 
@@ -77,7 +78,7 @@ void addLog(requete *req){
 	strcat(log, "\n");
 
 	/*ecrire dans le fichier de log*/
-	  pthread_mutex_lock(&fd_log_mutex);
+	pthread_mutex_lock(&fd_log_mutex);
 	i = 0;
 	while(log[i] != '\0'){
 		if(write(fd_log, &log[i], sizeof(char)) < 0){
