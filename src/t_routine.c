@@ -15,12 +15,111 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <sys/wait.h>
-
+#include <mqueue.h>
 
 #include "../include/initialisation.h"
 #include "../include/t_routine.h"
 #include "../include/globals.h"
 #include "../include/log.h"
+#include "../include/list_manipulation.h"
+
+void *routine_watcher(void *arg){
+	infos_watcher buf;
+	elem *element_ip;
+	elem *element_req;
+
+	for(;;){
+		if(mq_receive(mq_des, (char*) &buf, attr.mq_msgsize, NULL) == -1){
+			perror("Erreur de réception de la file de message");
+			/*return errno;*/
+		}
+		element_ip = malloc(sizeof(struct elem));
+		element_req = malloc(sizeof(struct elem));
+		printf("Un thread a mis a jour une ip : %s\n", buf.ip);
+		printf("Un thread a mis a jour une size : %d\n", buf.data);
+		printf("Un thread a mis a jour une tid : %ld\n", buf.tid);
+		/*buf.case_mutex = PTHREAD_MUTEX_INITIALIZER;*/
+		buf.timer = 0;
+		element_ip->info = buf;
+		element_req->info = buf;
+		element_req->info.timer = 60;
+
+		sem_wait(&semaphore2);
+		while(cpt_ip != 0){}
+		add_elem_ip(element_ip);
+		sem_post(&semaphore2);
+
+		sem_wait(&semaphore3);
+		add_elem_req(element_req);
+		sem_post(&semaphore3);
+
+		print_list();
+	}
+	/*mq_close(mq_des);*/
+	pthread_exit(NULL);
+}
+
+void *routine_clock_ip(void* arg){
+	elem *element_tmp;
+	for(;;){
+		if(liste_ip.first != NULL){
+			element_tmp = liste_ip.first;
+			sem_wait(&semaphore1);
+			sem_wait(&semaphore2);
+			pthread_mutex_lock(&cpt_ip_mutex);
+			cpt_ip++;
+			pthread_mutex_unlock(&cpt_ip_mutex);
+			sem_post(&semaphore1);
+			sem_post(&semaphore2);
+			do{
+				if(element_tmp->info.timer > 0){
+					element_tmp->info.timer--;
+				}
+			}while((element_tmp = element_tmp->next) != NULL);
+			pthread_mutex_lock(&cpt_ip_mutex);
+			cpt_ip--;
+			pthread_mutex_unlock(&cpt_ip_mutex);
+		}
+		sleep(1);
+		printf("Decrementation timer liste ip\n");
+	}
+	pthread_exit(NULL);
+}
+
+/*Delete si timer atteint zero, puis decremente data dans liste_req et si data == 0 et timer == 0 alors on delete*/
+void *routine_clock_req(void* arg){
+	elem *element_tmp;
+	/*elem *element_cpy;*/
+	for(;;){
+		if(liste_req.first != NULL){
+			element_tmp = liste_req.first;
+			sem_wait(&semaphore3);
+			do{
+				if(element_tmp->info.timer > 0){
+					element_tmp->info.timer--;
+				}
+				else{
+					/*element_cpy = malloc(sizeof(struct elem));
+					element_cpy = element_tmp;*/
+					delete_elem_req(element_tmp);
+
+					sem_wait(&semaphore2);
+					while(cpt_ip != 0){}
+					decrement_ip_data(element_tmp);
+					sem_post(&semaphore2);
+					/*delete la case dans liste req et decrementer dans liste ip
+					check si data = 0 et timer = 0
+					si oui delete dans liste ip*/
+				}
+			}while((element_tmp = element_tmp->next) != NULL);
+			sem_post(&semaphore3);
+		}
+		sleep(1);
+		printf("Decrementation timer liste req\n");
+		print_list();
+	}
+	pthread_exit(NULL);
+}
 
 /*Va read les requetes d'une meme connexion puis creer des threads routines
   answer pour y repondre, en leur donnant en argument le thread qu'ils doivent
@@ -125,6 +224,7 @@ void *routine_answer(void* arg) {
 	char http_code[5] = "200 ";
 	char http_msg_retour[50] = "OK\n";
 	char *filepath, *extension, *type;
+	char filename[100];
 	struct stat stat_file;
 	int status;
 	int pid;
@@ -135,11 +235,12 @@ void *routine_answer(void* arg) {
 	int size = 0;
 	unsigned int i;
 	int j;
-	char filename[100];
+	infos_watcher iw;
+	char ip_tmp[20];
+	int ip_banned;
 
 	exe = malloc(sizeof(struct executable));
 	exe->killed = 0;
-
 
 	if(req->thread_to_join != 0){
 		pthread_join(req->thread_to_join, NULL);
@@ -147,7 +248,43 @@ void *routine_answer(void* arg) {
 
 	filepath = getFilepath(req->msg);
 
-	if (stat(filepath, &stat_file) == -1) { /*si la ressource n'existe pas*/
+	sprintf(ip_tmp, "%s", inet_ntoa(req->sin.sin_addr));
+	/*Envoie la taille de ce qu'il a ecrit au watcher seulement une fois qu'il a fini d'ecrire puis on unlock : Race condition pour mettre le data a jour??*/
+
+
+	sem_wait(&semaphore1);
+	sem_wait(&semaphore2);
+	pthread_mutex_lock(&cpt_ip_mutex);
+	cpt_ip++;
+	pthread_mutex_unlock(&cpt_ip_mutex);
+	sem_post(&semaphore1);
+	sem_post(&semaphore2);
+	ip_banned = check_ip(ip_tmp);
+	pthread_mutex_lock(&cpt_ip_mutex);
+	cpt_ip--;
+	pthread_mutex_unlock(&cpt_ip_mutex);
+
+	/*Parcours les listes chainees avant chaque ecriture*/
+	/*Mettre un mutex commun (dans la structure infos_watcher) a toutes les threads
+	d'une meme ip avant ecriture, de cette maniere on est surs que le data est a jour*/
+	if(ip_banned){   /*si l'adresse ip du client a deja atteint le seuil*/
+		strcpy(http_code, "403 ");
+		strcpy(http_msg_retour, "Forbidden\n");
+
+		memset(http_header, 0, sizeof(http_header));
+
+		strcpy(http_header, "HTTP/1.1 ");
+		strcat(http_header, http_code);
+		strcat(http_header, http_msg_retour);
+
+		strcpy(req->http_code, http_code);
+
+		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
+			perror("Erreur d'ecriture sur la socket\n");
+		}
+		size = 0;
+	}
+	else if (stat(filepath, &stat_file) == -1) { /*si la ressource n'existe pas*/
 		perror("erreur stat");
 		if(errno == EACCES){ /*Permissions insuffisantes pour acceder au fichier*/
 			strcpy(http_code, "403 ");
@@ -162,6 +299,7 @@ void *routine_answer(void* arg) {
 
 		memset(http_header, 0, sizeof(http_header));
 
+		/*TODO : factoriser*/
 		strcpy(http_header, "HTTP/1.1 ");
 		strcat(http_header, http_code);
 		strcat(http_header, http_msg_retour);
@@ -174,7 +312,7 @@ void *routine_answer(void* arg) {
 		}
 		size = 0;
 		/*return errno;*/
-	} 
+	}
 	else if(S_ISDIR(stat_file.st_mode)){ /*si la ressource demandée est un dossier, on envoit une erreur 400*/
 		strcpy(http_code, "400 ");
 		strcpy(http_msg_retour, "Bad Request\n");
@@ -192,7 +330,7 @@ void *routine_answer(void* arg) {
 			/*return errno;*/
 		}
 		size = 0;
-	} 
+	}
 	else if(stat_file.st_mode & S_IXUSR){ /* si la ressource est un exécutable */
 		if(pipe(descripteurTube) != 0) {
 			fprintf(stderr, "Erreur de création du tube.\n");
@@ -228,7 +366,7 @@ void *routine_answer(void* arg) {
 			dup2(descripteurTube[1],STDOUT_FILENO);
 			execl(filepath, filename, NULL);
 			exit(EXIT_FAILURE);
-		} 
+		}
 		else{
 			exe->pid_fils = pid;
 
@@ -260,7 +398,7 @@ void *routine_answer(void* arg) {
 					perror("Erreur d'ecriture sur la socket\n");
 					/*return errno;*/
 				}
-			} 
+			}
 			else {
 				printf("Exécutable : succès\n");
 				size = 0;
@@ -282,7 +420,7 @@ void *routine_answer(void* arg) {
 
 			size = req->size_file;
 		}
-	} 
+	}
 	else { /* si la ressource n'est pas un exécutable */
 		strcpy(filepath_cpy, filepath);
 		extension = getExtension(filepath_cpy);
@@ -301,7 +439,6 @@ void *routine_answer(void* arg) {
 			}
 		}
 
-		/*TODO : Corriger cas text/plain*/
 		memset(http_header, 0, sizeof(http_header));
 
 		strcpy(http_header, "HTTP/1.1 ");
@@ -354,6 +491,18 @@ void *routine_answer(void* arg) {
 	printf("Code HTTP : %s\n", http_code);
 	printf("Quantité données renvoyées : %d octets\n", size);
 
+	/*iw = malloc(sizeof(infos_watcher));*/
+	sprintf(iw.ip, "%s", inet_ntoa(req->sin.sin_addr));
+	iw.tid = pthread_self();
+	iw.data = size;
+	if(mq_send(mq_des, (const char*) &iw,  sizeof(struct infos_watcher), 0) == -1){
+		perror("Erreur d'envoi du message a la file de message\n");
+		/*return errno;*/
+	}
+
+	printf("Dans thread_answer, tid : %ld\n", iw.tid);
+	printf("Dans thread_answer, ip : %s\n", iw.ip);
+	printf("Dans thread_answer, data : %d\n", iw.data);
 	addLog(req);
 
 	pthread_exit(NULL);

@@ -26,4 +26,27 @@ struct executable{
 	int killed;
 };
 
+typedef struct infos_watcher infos_watcher;
+struct infos_watcher{
+	char ip[20];
+	int data; /*en octets*/
+	int timer; /*10 secs pour liste_ip et 60 secs pour liste_req  */
+	pthread_t tid;
+	pthread_mutex_t case_mutex; /*Le thread watcher va initialiser le mutex PTHREAD_MUTEX_INITIALIZER*/
+};
+
+typedef struct elem elem;
+struct elem{
+	elem *prev;
+	infos_watcher info;
+	elem *next;
+};
+
+typedef struct list list;
+struct list{
+	elem *first;
+	elem *last;
+};
+
+
 #endif
