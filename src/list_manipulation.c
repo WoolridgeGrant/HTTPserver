@@ -24,6 +24,8 @@ void add_elem_ip(elem *element){
 		do{
 			if(strcmp(element_tmp->info.ip, element->info.ip) == 0){
 				element_tmp->info.data += element->info.data;
+				if(element_tmp->info.data > seuil_octets)
+					element_tmp->info.timer = 10;
 				free(element);
 				return;
 			}
@@ -59,6 +61,7 @@ void print_list(){
 		printf("Liste ip\n");
 		do{
 			printf("Data : %d\n", element->info.data);
+			printf("Timer : %d\n", element->info.timer);
 		}while( (element = element->next) != NULL);
 	}
 	else{
@@ -70,6 +73,7 @@ void print_list(){
 		do{
 			printf("Data : %d\n", element->info.data);
 			printf("Thread en charge : %ld\n", element->info.tid);
+			printf("Timer : %d\n", element->info.timer);
 		}while( (element = element->next) != NULL);
 	}
 	else{
@@ -77,6 +81,26 @@ void print_list(){
 	}
 }
 
+int check_ip(char *ip){ /*retourne 1 si le client a atteint le seuil de data*/
+	elem *element_tmp;
+	printf("ip passee a check_ip : %s\n", ip);
+	if(liste_ip.first != NULL){
+		printf("Dans if liste_ip\n");
+		element_tmp = liste_ip.first;
+		do{
+			if(strcmp(element_tmp->info.ip, ip) == 0){
+				if(element_tmp->info.timer > 0){
+					element_tmp->info.timer = 10;
+					return 1;
+				}
+				return element_tmp->info.data > seuil_octets;
+			}
+		}while((element_tmp = element_tmp->next) != NULL);
+	}
+	return 0;
+}
+
+/*Ne pas delete si timer > 0 AVANT DE DELETE IL FAUT REVERIFIER UNE FOIS QUE DATA = 0*/
 void delete_elem_ip(elem *element){
 
 

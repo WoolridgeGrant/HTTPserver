@@ -6,6 +6,7 @@
 extern mime mimes[800];
 extern int size_mimes;
 extern int fd_log;
+extern int seuil_octets;
 extern pthread_mutex_t fd_log_mutex;
 extern char filename_log[30];
 

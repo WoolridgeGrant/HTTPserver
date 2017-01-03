@@ -31,6 +31,7 @@
 mime mimes[800];
 int size_mimes = 0;
 int fd_log;
+int seuil_octets;
 char filename_log[30] = "tmp/http_2900793_3100300.log";
 pthread_mutex_t fd_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -51,7 +52,7 @@ pthread_mutex_t cpt_req_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char * argv[]){
 	struct sockaddr_in sin;
-	int sock_connexion, PORTSERV, nb_clients_max, seuil_octets;
+	int sock_connexion, PORTSERV, nb_clients_max;
 	unsigned int taille_addr = sizeof(sin);
 	pthread_t *th;
 	pthread_t watcher_tid;

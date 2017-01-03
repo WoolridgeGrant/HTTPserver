@@ -45,6 +45,7 @@ void *routine_watcher(void *arg){
 		buf.timer = 0;
 		element_ip->info = buf;
 		element_req->info = buf;
+		element_req->info.timer = 60;
 
 		sem_wait(&semaphore2);
 		while(cpt_ip != 0){}
@@ -180,6 +181,8 @@ void *routine_answer(void* arg) {
 	unsigned int i;
 	int j;
 	infos_watcher iw;
+	char ip_tmp[20];
+	int ip_banned;
 
 	exe = malloc(sizeof(struct executable));
 	exe->killed = 0;
@@ -190,12 +193,43 @@ void *routine_answer(void* arg) {
 
 	filepath = getFilepath(req->msg);
 
+	sprintf(ip_tmp, "%s", inet_ntoa(req->sin.sin_addr));
 	/*Envoie la taille de ce qu'il a ecrit au watcher seulement une fois qu'il a fini d'ecrire puis on unlock : Race condition pour mettre le data a jour??*/
+
+
+	sem_wait(&semaphore1);
+	sem_wait(&semaphore2);
+	pthread_mutex_lock(&cpt_ip_mutex);
+	cpt_ip++;
+	pthread_mutex_unlock(&cpt_ip_mutex);
+	sem_post(&semaphore1);
+	sem_post(&semaphore2);
+	ip_banned = check_ip(ip_tmp);
+	pthread_mutex_lock(&cpt_ip_mutex);
+	cpt_ip--;
+	pthread_mutex_unlock(&cpt_ip_mutex);
 
 	/*Parcours les listes chainees avant chaque ecriture*/
 	/*Mettre un mutex commun (dans la structure infos_watcher) a toutes les threads
 	d'une meme ip avant ecriture, de cette maniere on est surs que le data est a jour*/
-	if (stat(filepath, &stat_file) == -1) { /*si la ressource n'existe pas*/
+	if(ip_banned){   /*si l'adresse ip du client a deja atteint le seuil*/
+		strcpy(http_code, "403 ");
+		strcpy(http_msg_retour, "Forbidden\n");
+
+		memset(http_header, 0, sizeof(http_header));
+
+		strcpy(http_header, "HTTP/1.1 ");
+		strcat(http_header, http_code);
+		strcat(http_header, http_msg_retour);
+
+		strcpy(req->http_code, http_code);
+
+		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
+			perror("Erreur d'ecriture sur la socket\n");
+		}
+		size = 0;
+	}
+	else if (stat(filepath, &stat_file) == -1) { /*si la ressource n'existe pas*/
 		perror("erreur stat");
 		if(errno == EACCES){ /*Permissions insuffisantes pour acceder au fichier*/
 			strcpy(http_code, "403 ");
@@ -210,13 +244,14 @@ void *routine_answer(void* arg) {
 
 		memset(http_header, 0, sizeof(http_header));
 
+		/*TODO : factoriser*/
 		strcpy(http_header, "HTTP/1.1 ");
 		strcat(http_header, http_code);
 		strcat(http_header, http_msg_retour);
 
 		strcpy(req->http_code, http_code);
 
-		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){  /*******************ICI**************************/
+		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
 			perror("Erreur d'ecriture sur la socket\n");
 			/*return errno;*/
 		}
@@ -235,7 +270,7 @@ void *routine_answer(void* arg) {
 
 		strcpy(req->http_code, http_code);
 
-		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){  /*******************ICI**************************/
+		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
 			perror("Erreur d'ecriture sur la socket\n");
 			/*return errno;*/
 		}
@@ -304,7 +339,7 @@ void *routine_answer(void* arg) {
 				strcat(http_header, http_code);
 				strcat(http_header, http_msg_retour);
 
-				if(write(req->soc_com, http_header, sizeof(http_header)) < 0){  /*******************ICI**************************/
+				if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
 					perror("Erreur d'ecriture sur la socket\n");
 					/*return errno;*/
 				}
@@ -363,7 +398,7 @@ void *routine_answer(void* arg) {
 
 		strcpy(req->http_code, http_code);
 
-		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){  /*******************ICI**************************/
+		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
 			perror("Erreur d'ecriture sur la socket\n");
 			/*return errno;*/
 		}
@@ -379,7 +414,7 @@ void *routine_answer(void* arg) {
 				}
 
 				/*On ecrit la taille qu'on lit sinon on aura des caracteres indesirables*/
-				if(write(req->soc_com, download_buffer, retour_read) < 0){  /*******************ICI**************************/
+				if(write(req->soc_com, download_buffer, retour_read) < 0){
 					perror("Erreur d'ecriture sur la socket\n");
 					/*return errno;*/
 				}
