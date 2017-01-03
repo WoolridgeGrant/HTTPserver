@@ -219,7 +219,7 @@ void *routine_answer(void* arg) {
 	int fd, retour_read;
 	int erreur = 0; /*s'il y a erreur alors egal a 1*/
 	char download_buffer[BUFFERSIZE];
-	char http_header[50];
+	char http_header[500];
 	char filepath_cpy[50];
 	char http_code[5] = "200 ";
 	char http_msg_retour[50] = "OK\n";
@@ -229,6 +229,7 @@ void *routine_answer(void* arg) {
 	int status;
 	int pid;
 	char msg_tube[100];
+	char msg_erreur[100];
 	int descripteurTube[2];
 	int code_retour_fils;
 	executable *exe;
@@ -268,21 +269,39 @@ void *routine_answer(void* arg) {
 	/*Mettre un mutex commun (dans la structure infos_watcher) a toutes les threads
 	d'une meme ip avant ecriture, de cette maniere on est surs que le data est a jour*/
 	if(ip_banned){   /*si l'adresse ip du client a deja atteint le seuil*/
+		printf("ip_banned\n");
 		strcpy(http_code, "403 ");
 		strcpy(http_msg_retour, "Forbidden\n");
 
 		memset(http_header, 0, sizeof(http_header));
+		memset(msg_erreur, 0, sizeof(msg_erreur));
 
 		strcpy(http_header, "HTTP/1.1 ");
+		printf("1\n");
 		strcat(http_header, http_code);
+		printf("2\n");
 		strcat(http_header, http_msg_retour);
+		printf("3\n");
+		strcat(http_header, "Content-Type: text/HTML");
+		printf("5\n");
+		strcat(http_header, "\n\n");
+		printf("ici\n");
+		strcat(msg_erreur, http_code);
+		strcat(msg_erreur, " ");
+		strcat(msg_erreur, http_msg_retour);
+		strcat(msg_erreur, "ip banned\r\n");
 
 		strcpy(req->http_code, http_code);
 
 		if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
 			perror("Erreur d'ecriture sur la socket\n");
 		}
+		if(write(req->soc_com, msg_erreur, sizeof(msg_erreur)) < 0){
+			perror("Erreur d'ecriture sur la socket\n");
+			/*return errno;*/
+		}
 		size = 0;
+		printf("fin ip_banned");
 	}
 	else if (stat(filepath, &stat_file) == -1) { /*si la ressource n'existe pas*/
 		perror("erreur stat");
@@ -303,6 +322,11 @@ void *routine_answer(void* arg) {
 		strcpy(http_header, "HTTP/1.1 ");
 		strcat(http_header, http_code);
 		strcat(http_header, http_msg_retour);
+		strcat(http_header, "Content-Type: text/HTML");
+		strcat(http_header, "\n\n");
+		strcat(http_header, http_code);
+		strcat(http_header, " ");
+		strcat(http_header, http_msg_retour);
 
 		strcpy(req->http_code, http_code);
 
@@ -321,6 +345,11 @@ void *routine_answer(void* arg) {
 
 		strcpy(http_header, "HTTP/1.1 ");
 		strcat(http_header, http_code);
+		strcat(http_header, http_msg_retour);
+		strcat(http_header, "Content-Type: text/HTML");
+		strcat(http_header, "\n\n");
+		strcat(http_header, http_code);
+		strcat(http_header, " ");
 		strcat(http_header, http_msg_retour);
 
 		strcpy(req->http_code, http_code);
@@ -393,6 +422,11 @@ void *routine_answer(void* arg) {
 				strcpy(http_header, "HTTP/1.1 ");
 				strcat(http_header, http_code);
 				strcat(http_header, http_msg_retour);
+				strcat(http_header, "Content-Type: text/HTML");
+				strcat(http_header, "\n\n");
+				strcat(http_header, http_code);
+				strcat(http_header, " ");
+				strcat(http_header, http_msg_retour);
 
 				if(write(req->soc_com, http_header, sizeof(http_header)) < 0){
 					perror("Erreur d'ecriture sur la socket\n");
@@ -449,6 +483,13 @@ void *routine_answer(void* arg) {
 			strcat(http_header, "Content-Type: ");
 			strcat(http_header, type);
 			strcat(http_header, "\n\n"); /*Important de laisser une ligne vide entre le Content-Type et le contenu du fichier*/
+		}
+		else{
+			strcat(http_header, "Content-Type: text/HTML");
+			strcat(http_header, "\n\n");
+			strcat(http_header, http_code);
+			strcat(http_header, " ");
+			strcat(http_header, http_msg_retour);
 		}
 
 		strcpy(req->http_code, http_code);

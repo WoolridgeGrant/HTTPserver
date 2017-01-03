@@ -1,5 +1,5 @@
 #include "struct.h" /*TODO : A revoir surement pas la maniere optimale de faire ca*/
-#include "mqueue.h"
+#include <mqueue.h>
 
 #include <semaphore.h>
 
