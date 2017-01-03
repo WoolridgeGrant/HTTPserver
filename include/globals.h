@@ -19,6 +19,6 @@ extern list liste_req;
 extern sem_t semaphore1;
 extern sem_t semaphore2;
 extern int cpt_ip; /*compte le nombre de threads restantes sur une liste avant de pouvoir ajouter ou supprimer un elem*/
-extern int cpt_req;
 extern pthread_mutex_t cpt_ip_mutex;
-extern pthread_mutex_t cpt_req_mutex;
+
+extern sem_t semaphore3;

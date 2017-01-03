@@ -50,9 +50,11 @@ void *routine_watcher(void *arg){
 		sem_wait(&semaphore2);
 		while(cpt_ip != 0){}
 		add_elem_ip(element_ip);
-		while(cpt_req != 0){}
-		add_elem_req(element_req);
 		sem_post(&semaphore2);
+
+		sem_wait(&semaphore3);
+		add_elem_req(element_req);
+		sem_post(&semaphore3);
 
 		print_list();
 	}
@@ -61,7 +63,56 @@ void *routine_watcher(void *arg){
 	pthread_exit(NULL);
 }
 
-void *routine_clock(void* arg){
+void *routine_clock_ip(void* arg){
+	elem *element_tmp;
+	for(;;){
+		if(liste_ip.first != NULL){
+			element_tmp = liste_ip.first;
+			sem_wait(&semaphore1);
+			sem_wait(&semaphore2);
+			pthread_mutex_lock(&cpt_ip_mutex);
+			cpt_ip++;
+			pthread_mutex_unlock(&cpt_ip_mutex);
+			sem_post(&semaphore1);
+			sem_post(&semaphore2);
+			do{
+				if(element_tmp->info.timer > 0){
+					element_tmp->info.timer--;
+				}
+			}while((element_tmp = element_tmp->next) != NULL);
+			pthread_mutex_lock(&cpt_ip_mutex);
+			cpt_ip--;
+			pthread_mutex_unlock(&cpt_ip_mutex);
+		}
+		sleep(1);
+		printf("Decrementation timer liste ip\n");
+	}
+	pthread_exit(NULL);
+}
+
+/*Delete si timer atteint zero, puis decremente data dans liste_req et si data == 0 et timer == 0 alors on delete*/
+void *routine_clock_req(void* arg){
+	elem *element_tmp;
+	for(;;){
+		if(liste_req.first != NULL){
+			element_tmp = liste_req.first;
+			sem_wait(&semaphore3);
+			do{
+				if(element_tmp->info.timer > 0){
+					element_tmp->info.timer--;
+				}
+				/*else{
+					delete la case dans liste req et decrementer dans liste ip
+					check si data = 0 et timer = 0
+					si oui delete dans liste ip
+				}*/
+			}while((element_tmp = element_tmp->next) != NULL);
+			sem_post(&semaphore3);
+		}
+		sleep(1);
+		printf("Decrementation timer liste req\n");
+		print_list();
+	}
 	pthread_exit(NULL);
 }
 

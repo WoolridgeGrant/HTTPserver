@@ -43,12 +43,14 @@ pthread_mutex_t fd_mq_mutex = PTHREAD_MUTEX_INITIALIZER;
 list liste_ip;
 list liste_req;
 
+/*Pour la liste des ip*/
 sem_t semaphore1;
 sem_t semaphore2;
 int cpt_ip; /*compte le nombre de threads restantes sur une liste avant de pouvoir ajouter ou supprimer un elem*/
-int cpt_req;
 pthread_mutex_t cpt_ip_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t cpt_req_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/*Pour la liste des requetes*/
+sem_t semaphore3;
 
 int main(int argc, char * argv[]){
 	struct sockaddr_in sin;
@@ -56,6 +58,8 @@ int main(int argc, char * argv[]){
 	unsigned int taille_addr = sizeof(sin);
 	pthread_t *th;
 	pthread_t watcher_tid;
+	pthread_t clock_ip_tid;
+	pthread_t clock_req_tid;
 	requete *req;
 	struct stat stat_info;
 	struct stat stat_info_dir;
@@ -76,9 +80,9 @@ int main(int argc, char * argv[]){
 
 	sem_init(&semaphore1, 0, 1);
 	sem_init(&semaphore2, 0, 1);
+	sem_init(&semaphore3, 0, 1);
 
 	cpt_ip = 0;
-	cpt_req = 0;
 
 	/*Initialisation de la file de message*/
 
@@ -126,7 +130,14 @@ int main(int argc, char * argv[]){
 		printf("pthread_create\n");
 		exit(1);
 	}
-
+	if (pthread_create(&clock_ip_tid, NULL, routine_clock_ip, NULL) != 0) {
+		printf("pthread_create\n");
+		exit(1);
+	}
+	if (pthread_create(&clock_req_tid, NULL, routine_clock_req, NULL) != 0) {
+		printf("pthread_create\n");
+		exit(1);
+	}
 
 	printf("apres creation watcher\n");
 

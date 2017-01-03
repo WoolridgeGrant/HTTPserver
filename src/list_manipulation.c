@@ -101,18 +101,18 @@ int check_ip(char *ip){ /*retourne 1 si le client a atteint le seuil de data*/
 }
 
 /*Ne pas delete si timer > 0 AVANT DE DELETE IL FAUT REVERIFIER UNE FOIS QUE DATA = 0*/
-void delete_elem_ip(elem *element){
+void delete_elem_ip(elem *element){ /*Suppression qd data = 0 && timer = 0*/
 
 
 }
 
 
-void delete_elem_req(elem *element){
+void delete_elem_req(elem *element){ /*Suppression qd timer = 0*/
 
 
 }
 
-/*check par routine_answer
+/*check par routine_answer OK
 sem_wait(1);
 sem_wait(2);
 cpt++;
