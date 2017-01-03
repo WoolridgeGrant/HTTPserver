@@ -15,11 +15,13 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <mqueue.h>
+#include <semaphore.h>
 
 #include "../include/struct.h"
 #include "../include/initialisation.h"
 #include "../include/t_routine.h"
 #include "../include/globals.h"
+#include "../include/list_manipulation.h"
 
 /*Le serveur prend en argument le numero de port sur lequel il ecoute,
   le nombre de clients qu'il peut accepter simultanement
@@ -35,6 +37,17 @@ pthread_mutex_t fd_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 mqd_t mq_des;
 struct mq_attr attr;
 pthread_mutex_t fd_mq_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/*Listes doublement chainees*/
+list liste_ip;
+list liste_req;
+
+sem_t semaphore1;
+sem_t semaphore2;
+int cpt_ip; /*compte le nombre de threads restantes sur une liste avant de pouvoir ajouter ou supprimer un elem*/
+int cpt_req;
+pthread_mutex_t cpt_ip_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t cpt_req_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char * argv[]){
 	struct sockaddr_in sin;
@@ -54,6 +67,17 @@ int main(int argc, char * argv[]){
 	PORTSERV = atoi(argv[1]);
 	nb_clients_max = atoi(argv[2]);
 	seuil_octets = atoi(argv[3]);
+
+	liste_ip.first = NULL;
+	liste_ip.last = NULL;
+	liste_req.first = NULL;
+	liste_req.last = NULL;
+
+	sem_init(&semaphore1, 0, 1);
+	sem_init(&semaphore2, 0, 1);
+
+	cpt_ip = 0;
+	cpt_req = 0;
 
 	/*Initialisation de la file de message*/
 

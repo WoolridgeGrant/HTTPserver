@@ -12,7 +12,7 @@ LIB=$(DIR)/lib/
 SRC=$(DIR)/src/
 
 HC=
-O=$(OBJ)initialisation.o $(OBJ)t_routine.o $(OBJ)log.o
+O=$(OBJ)initialisation.o $(OBJ)t_routine.o $(OBJ)log.o $(OBJ)list_manipulation.o
 
 .PHONY: all clean curl project
 all: $(BIN)main clean

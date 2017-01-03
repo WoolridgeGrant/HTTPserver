@@ -21,23 +21,39 @@
 #include "../include/t_routine.h"
 #include "../include/globals.h"
 #include "../include/log.h"
+#include "../include/list_manipulation.h"
 
 void *routine_watcher(void *arg){
-	unsigned int prio;
 	infos_watcher buf;
+	elem *element_ip;
+	elem *element_req;
 	/*buf = malloc(sizeof(infos_watcher));*/
 
 	printf("Dans thread watcher\n");
-	printf("Valeur de attr.mq_msgsize dans routine_watcher : %d\n", attr.mq_msgsize);
 
 	for(;;){
 		if(mq_receive(mq_des, (char*) &buf, attr.mq_msgsize, NULL) == -1){
 			perror("Erreur de réception de la file de message");
 			/*return errno;*/
 		}
-		printf("Un thread a mis a jour une data ip : %s\n", buf.ip);
-		printf("Un thread a mis a jour une data size : %d\n", buf.data);
-		printf("Un thread a mis a jour une data tid : %ld\n", buf.tid);
+		element_ip = malloc(sizeof(struct elem));
+		element_req = malloc(sizeof(struct elem));
+		printf("Un thread a mis a jour une ip : %s\n", buf.ip);
+		printf("Un thread a mis a jour une size : %d\n", buf.data);
+		printf("Un thread a mis a jour une tid : %ld\n", buf.tid);
+		/*buf.case_mutex = PTHREAD_MUTEX_INITIALIZER;*/
+		buf.timer = 0;
+		element_ip->info = buf;
+		element_req->info = buf;
+
+		sem_wait(&semaphore2);
+		while(cpt_ip != 0){}
+		add_elem_ip(element_ip);
+		while(cpt_req != 0){}
+		add_elem_req(element_req);
+		sem_post(&semaphore2);
+
+		print_list();
 	}
 	/*free(buf);*/
 	/*mq_close(mq_des);*/
@@ -389,8 +405,6 @@ void *routine_answer(void* arg) {
 	sprintf(iw.ip, "%s", inet_ntoa(req->sin.sin_addr));
 	iw.tid = pthread_self();
 	iw.data = size;
-	printf("mq_des valeur dans thread_answer : %d\n", mq_des);
-	printf("Valeur de attr.mq_msgsize dans thread_answer : %d\n", attr.mq_msgsize);
 	if(mq_send(mq_des, (const char*) &iw,  sizeof(struct infos_watcher), 0) == -1){
 		perror("Erreur d'envoi du message a la file de message\n");
 		/*return errno;*/
