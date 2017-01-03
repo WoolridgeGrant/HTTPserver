@@ -32,7 +32,7 @@ mime mimes[800];
 int size_mimes = 0;
 int fd_log;
 int seuil_octets;
-char filename_log[30] = "tmp/http_2900793_3100300.log";
+char filename_log[30] = "/tmp/http_2900793_3100300.log";
 pthread_mutex_t fd_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 mqd_t mq_des;
@@ -97,11 +97,6 @@ int main(int argc, char * argv[]){
 	}
 
 	addTypes();
-
-	/*Initialisation des log*/
-	if (stat("./tmp", &stat_info_dir) == -1) {
-		mkdir("./tmp", 0744);
-	}
 
 	if ( stat(filename_log, &stat_info) == -1) {
 		/*creation du fichier*/
