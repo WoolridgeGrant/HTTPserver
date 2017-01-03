@@ -8,7 +8,7 @@ extern int size_mimes;
 extern int fd_log;
 extern int seuil_octets;
 extern pthread_mutex_t fd_log_mutex;
-extern char filename_log[30];
+extern char filename_log[100];
 
 extern mqd_t mq_des;
 extern struct mq_attr attr;
