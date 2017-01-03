@@ -83,9 +83,7 @@ void print_list(){
 
 int check_ip(char *ip){ /*retourne 1 si le client a atteint le seuil de data*/
 	elem *element_tmp;
-	printf("ip passee a check_ip : %s\n", ip);
 	if(liste_ip.first != NULL){
-		printf("Dans if liste_ip\n");
 		element_tmp = liste_ip.first;
 		do{
 			if(strcmp(element_tmp->info.ip, ip) == 0){
@@ -101,15 +99,64 @@ int check_ip(char *ip){ /*retourne 1 si le client a atteint le seuil de data*/
 }
 
 /*Ne pas delete si timer > 0 AVANT DE DELETE IL FAUT REVERIFIER UNE FOIS QUE DATA = 0*/
-void delete_elem_ip(elem *element){ /*Suppression qd data = 0 && timer = 0*/
-
-
+void decrement_ip_data(elem *element){ /*Suppression qd data = 0 && timer = 0*/
+	/*Prends en argument un element contenant de combien il faut decrementer
+	et quelle ip decrementer. Si data == 0 et timer == 0 alors on delete la case*/
+	elem *element_tmp;
+	if(liste_ip.first != NULL){
+		element_tmp = liste_ip.first;
+		do{
+			if(strcmp(element_tmp->info.ip, element->info.ip) == 0){
+				element_tmp->info.data -= element->info.data;
+				if(element_tmp->info.data == 0){
+					if(element_tmp->prev == NULL){ /*premier element*/
+						if(element_tmp->next == NULL){ /*Un seul elem dans la liste*/
+							liste_ip.first = NULL;
+							liste_ip.last = NULL;
+						}
+						else{ /*plus d'un elem dans la liste*/
+							liste_ip.first = element_tmp->next;
+							element_tmp->next->prev = NULL;
+						}
+					}
+					else if(element_tmp->next == NULL){ /*dernier element*/
+						liste_ip.last = element_tmp->prev;
+						element_tmp->prev->next = NULL;
+					}
+					else{
+						element_tmp->prev->next = element_tmp->next;
+						element_tmp->next->prev = element_tmp->prev;
+					}
+					free(element_tmp);
+				}
+				free(element);
+				break;
+			}
+		}while((element_tmp = element_tmp->next) != NULL);
+	}
 }
 
-
+/*Manque un free*/
 void delete_elem_req(elem *element){ /*Suppression qd timer = 0*/
-
-
+	/*On peut utiliser directement l'element pour corriger le prev et le next*/
+	if(element->prev == NULL){ /*premier element*/
+		if(element->next == NULL){ /*Un seul elem dans la liste*/
+			liste_req.first = NULL;
+			liste_req.last = NULL;
+		}
+		else{ /*plus d'un elem dans la liste*/
+			liste_req.first = element->next;
+			element->next->prev = NULL;
+		}
+	}
+	else if(element->next == NULL){ /*dernier element*/
+		liste_req.last = element->prev;
+		element->prev->next = NULL;
+	}
+	else{
+		element->prev->next = element->next;
+		element->next->prev = element->prev;
+	}
 }
 
 /*check par routine_answer OK

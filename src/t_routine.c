@@ -27,9 +27,6 @@ void *routine_watcher(void *arg){
 	infos_watcher buf;
 	elem *element_ip;
 	elem *element_req;
-	/*buf = malloc(sizeof(infos_watcher));*/
-
-	printf("Dans thread watcher\n");
 
 	for(;;){
 		if(mq_receive(mq_des, (char*) &buf, attr.mq_msgsize, NULL) == -1){
@@ -58,7 +55,6 @@ void *routine_watcher(void *arg){
 
 		print_list();
 	}
-	/*free(buf);*/
 	/*mq_close(mq_des);*/
 	pthread_exit(NULL);
 }
@@ -93,6 +89,7 @@ void *routine_clock_ip(void* arg){
 /*Delete si timer atteint zero, puis decremente data dans liste_req et si data == 0 et timer == 0 alors on delete*/
 void *routine_clock_req(void* arg){
 	elem *element_tmp;
+	/*elem *element_cpy;*/
 	for(;;){
 		if(liste_req.first != NULL){
 			element_tmp = liste_req.first;
@@ -101,11 +98,19 @@ void *routine_clock_req(void* arg){
 				if(element_tmp->info.timer > 0){
 					element_tmp->info.timer--;
 				}
-				/*else{
-					delete la case dans liste req et decrementer dans liste ip
+				else{
+					/*element_cpy = malloc(sizeof(struct elem));
+					element_cpy = element_tmp;*/
+					delete_elem_req(element_tmp);
+
+					sem_wait(&semaphore2);
+					while(cpt_ip != 0){}
+					decrement_ip_data(element_tmp);
+					sem_post(&semaphore2);
+					/*delete la case dans liste req et decrementer dans liste ip
 					check si data = 0 et timer = 0
-					si oui delete dans liste ip
-				}*/
+					si oui delete dans liste ip*/
+				}
 			}while((element_tmp = element_tmp->next) != NULL);
 			sem_post(&semaphore3);
 		}
@@ -137,7 +142,6 @@ void *routine_read_req(void* arg){
 	memset(reqs, 0, sizeof(reqs));
 
 	/*Linux interprete \r\n comme un seul saut de ligne, il ignore \r*/
-	printf("read routine\n");
 
 	*t_to_join = 0;
 

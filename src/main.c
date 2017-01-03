@@ -86,21 +86,15 @@ int main(int argc, char * argv[]){
 
 	/*Initialisation de la file de message*/
 
-	printf("avant mqopen\n");
 	if((mq_des = mq_open("/file3", O_RDWR | O_CREAT, 0644, NULL)) == -1){
 		perror("Erreur de création du file");
 		return EXIT_FAILURE;
 	}
 
-	printf("avant getaddr\n");
 	if(mq_getattr(mq_des, &attr) == -1){
 		perror("Erreur de recuperation des attributs du mq");
 		return errno;
 	}
-
-	printf("mq_des valeur dans main : %d\n", mq_des);
-	printf("apres getaddr\n");
-	/*buf = malloc(attr.mq_msgsize);*/
 
 	addTypes();
 
@@ -138,8 +132,6 @@ int main(int argc, char * argv[]){
 		printf("pthread_create\n");
 		exit(1);
 	}
-
-	printf("apres creation watcher\n");
 
 	/*Mise en place de la socket*/
 	if( (sock_connexion = socket(AF_INET, SOCK_STREAM, 0)) == -1){
