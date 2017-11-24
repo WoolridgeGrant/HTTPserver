@@ -1,0 +1,31 @@
+// Recensement de ce qui a été appris pendant le projet
+
+Pour faire un makefile : http://www.gnu.org/software/make/manual/make.html#Introduction
+                          Ou plus simple aller dans le fichier ~/practice/test et regarder makefileTD5 et makefile_one pour comprendre
+
+all : http://stackoverflow.com/questions/2514903/what-does-all-stand-for-in-a-makefile?noredirect=1&lq=1
+      Lorsqu'on écrit juste "make" on ne précise aucune cible, donc par défaut il va build la première cible => la plupart du temps c'est all
+      all est juste un nom générique on pourrait mettre n'importe quoi à la place.
+
+.PHONY : Dans un makefile .PHONY permet de désigner toutes les cibles qui ne sont pas des fichiers, par conséquent ces cibles seront toujours dans un état
+      out-of-date, donc quand on fait make <phony-target> cela va l'exécuter indépendement de l'état du système de fichiers
+      http://stackoverflow.com/questions/2145590/what-is-the-purpose-of-phony-in-a-makefile
+
+Variables globales et fichiers c multiples : In the header file write it with extern. And at the global scope of one of the c files declare it without extern.
+        http://stackoverflow.com/questions/3010647/shared-global-variables-in-c
+        http://stackoverflow.com/questions/1433204/how-do-i-use-extern-to-share-variables-between-source-files-in-c
+
+Lorsqu'il y a plusieurs fichiers C, on peut mettre les includes sur tous les fichiers c qui en ont besoin. Cependant éviter autant que possible de mettre les
+include dans le .h
+Chaque .c a son .h avec ses prototypes. On include les .h sur les .c qui en ont besoin mais aussi sur le .c implémentant les prototypes de ses fonctions.
+
+errno : errno est THREAD-SAFE contrairement à ce qu'à dit sin jamas dans le TD4, donc sa valeur est différente selon le thread
+        http://stackoverflow.com/questions/1694164/is-errno-thread-safe
+
+sprintf : Permet de concaténer n'importe quel format (int, char etc) dans un char*
+        https://www.tutorialspoint.com/c_standard_library/c_function_sprintf.htm
+
+strtok : équivalent du split de javascript, strtok(str, pattern), va détruire complètement l'argument 1 str; A la fin de la fonction str sera égal à la toute
+        première chaine récup par le pattern
+
+http_header : Il est important de laisser une ligne vide entre le Content-Type et le contenu du fichier, sinon le début du fichier disparaîtra
